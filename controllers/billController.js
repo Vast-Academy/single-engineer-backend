@@ -15,7 +15,7 @@ const generateBillNumber = async (userId) => {
 // Create new bill
 const createBill = async (req, res) => {
     try {
-        const { customerId, items, discount, receivedPayment, paymentMethod } = req.body;
+        const { customerId, items, discount, receivedPayment, paymentMethod, workOrderId } = req.body;
 
         // Validate customer
         const customer = await Customer.findOne({ _id: customerId, createdBy: req.user._id });
@@ -55,6 +55,7 @@ const createBill = async (req, res) => {
                     itemName: service.serviceName,
                     qty: item.qty || 1,
                     price: service.servicePrice,
+                    purchasePrice: 0,  // Services have no purchase cost
                     amount
                 });
                 subtotal += amount;
@@ -93,6 +94,7 @@ const createBill = async (req, res) => {
                     serialNumber: item.serialNumber,
                     qty: 1,
                     price: inventoryItem.salePrice,
+                    purchasePrice: inventoryItem.purchasePrice,
                     amount
                 });
                 subtotal += amount;
@@ -128,6 +130,7 @@ const createBill = async (req, res) => {
                     itemName: inventoryItem.itemName,
                     qty,
                     price: inventoryItem.salePrice,
+                    purchasePrice: inventoryItem.purchasePrice,
                     amount
                 });
                 subtotal += amount;
@@ -164,8 +167,19 @@ const createBill = async (req, res) => {
             paymentMethod: paymentMethod || 'cash',
             paymentHistory: received > 0 ? [{ amount: received, paidAt: new Date() }] : [],
             status,
+            workOrderId: workOrderId || null,
             createdBy: req.user._id
         });
+
+        // If bill created from work order, auto-complete the work order
+        if (workOrderId) {
+            const WorkOrder = require('../models/WorkOrder');
+            await WorkOrder.findByIdAndUpdate(workOrderId, {
+                billId: newBill._id,
+                status: 'completed',
+                completedAt: new Date()
+            });
+        }
 
         return res.status(201).json({
             success: true,

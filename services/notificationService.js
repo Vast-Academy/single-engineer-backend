@@ -71,7 +71,7 @@ const sendWorkOrderReminders = async () => {
 
         const currentTimeStr = formatTime(currentHour, currentMinutes);
 
-        // Find pending work orders scheduled for today at current time
+        // Find pending work orders scheduled for today at current time (only with scheduled time)
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today);
@@ -80,6 +80,7 @@ const sendWorkOrderReminders = async () => {
         const pendingWorkOrders = await WorkOrder.find({
             status: 'pending',
             notificationSent: false,
+            hasScheduledTime: true,  // Only work orders with scheduled time
             scheduleDate: {
                 $gte: today,
                 $lt: tomorrow
@@ -93,7 +94,7 @@ const sendWorkOrderReminders = async () => {
             await sendNotification(
                 workOrder.createdBy,
                 'Work Order Reminder',
-                `${workOrder.workOrderType} for ${workOrder.customer?.customerName || 'Customer'} is scheduled now!`,
+                `${workOrder.note} for ${workOrder.customer?.customerName || 'Customer'} is scheduled now!`,
                 {
                     workOrderId: workOrder._id.toString(),
                     type: 'work_order_reminder'
@@ -134,9 +135,10 @@ const sendUpcomingReminders = async () => {
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
 
-        // Find work orders scheduled in ~30 minutes that haven't been reminded
+        // Find work orders scheduled in ~30 minutes (only with scheduled time)
         const upcomingWorkOrders = await WorkOrder.find({
             status: 'pending',
+            hasScheduledTime: true,  // Only work orders with scheduled time
             scheduleDate: {
                 $gte: today,
                 $lt: tomorrow
@@ -148,7 +150,7 @@ const sendUpcomingReminders = async () => {
             await sendNotification(
                 workOrder.createdBy,
                 'Upcoming Work Order',
-                `${workOrder.workOrderType} for ${workOrder.customer?.customerName || 'Customer'} in 30 minutes!`,
+                `${workOrder.note} for ${workOrder.customer?.customerName || 'Customer'} in 30 minutes!`,
                 {
                     workOrderId: workOrder._id.toString(),
                     type: 'work_order_upcoming'

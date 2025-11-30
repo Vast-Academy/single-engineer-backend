@@ -13,7 +13,7 @@ const generateWorkOrderNumber = async (userId) => {
 // Create new work order
 const createWorkOrder = async (req, res) => {
     try {
-        const { customerId, workOrderType, scheduleDate, scheduleTime, remark } = req.body;
+        const { customerId, note, scheduleDate, hasScheduledTime, scheduleTime } = req.body;
 
         // Validate customer
         const customer = await Customer.findOne({ _id: customerId, createdBy: req.user._id });
@@ -21,6 +21,22 @@ const createWorkOrder = async (req, res) => {
             return res.status(404).json({
                 success: false,
                 message: 'Customer not found'
+            });
+        }
+
+        // Validate note (mandatory)
+        if (!note || note.trim().length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Work note is required'
+            });
+        }
+
+        // Validate time ONLY if hasScheduledTime is true
+        if (hasScheduledTime && (!scheduleTime || scheduleTime === '')) {
+            return res.status(400).json({
+                success: false,
+                message: 'Schedule time is required when time is enabled'
             });
         }
 
@@ -43,10 +59,10 @@ const createWorkOrder = async (req, res) => {
         const newWorkOrder = await WorkOrder.create({
             customer: customerId,
             workOrderNumber,
-            workOrderType,
+            note: note.trim(),
+            hasScheduledTime: hasScheduledTime || false,
+            scheduleTime: hasScheduledTime ? scheduleTime : '',
             scheduleDate: scheduleDateObj,
-            scheduleTime,
-            remark: remark || '',
             status: 'pending',
             createdBy: req.user._id
         });
@@ -142,6 +158,94 @@ const getWorkOrder = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: 'Failed to get work order'
+        });
+    }
+};
+
+// Update work order details
+const updateWorkOrder = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { note, scheduleDate, hasScheduledTime, scheduleTime } = req.body;
+
+        const workOrder = await WorkOrder.findOne({
+            _id: id,
+            createdBy: req.user._id
+        });
+
+        if (!workOrder) {
+            return res.status(404).json({
+                success: false,
+                message: 'Work order not found'
+            });
+        }
+
+        if (workOrder.status === 'completed') {
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot edit completed work order'
+            });
+        }
+
+        // Validate note (mandatory)
+        if (note !== undefined) {
+            if (!note || note.trim().length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Work note is required'
+                });
+            }
+            workOrder.note = note.trim();
+        }
+
+        // Validate schedule date if provided
+        if (scheduleDate) {
+            const scheduleDateObj = new Date(scheduleDate);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            if (scheduleDateObj < today) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Schedule date cannot be in the past'
+                });
+            }
+            workOrder.scheduleDate = scheduleDateObj;
+        }
+
+        // Update time settings
+        if (hasScheduledTime !== undefined) {
+            workOrder.hasScheduledTime = hasScheduledTime;
+
+            if (hasScheduledTime) {
+                if (!scheduleTime || scheduleTime === '') {
+                    return res.status(400).json({
+                        success: false,
+                        message: 'Schedule time is required when time is enabled'
+                    });
+                }
+                workOrder.scheduleTime = scheduleTime;
+            } else {
+                workOrder.scheduleTime = '';
+            }
+        }
+
+        await workOrder.save();
+
+        const updatedWorkOrder = await WorkOrder.findById(id)
+            .populate('customer', 'customerName phoneNumber address');
+
+        return res.status(200).json({
+            success: true,
+            message: 'Work order updated successfully',
+            workOrder: updatedWorkOrder
+        });
+    } catch (error) {
+        console.error('Update work order error:', error.message);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to update work order',
+            error: error.message
         });
     }
 };
@@ -246,12 +350,51 @@ const getWorkOrdersByCustomer = async (req, res) => {
     }
 };
 
+// Link work order with bill
+const linkWithBill = async (req, res) => {
+    try {
+        const { workOrderId, billId } = req.body;
+
+        const workOrder = await WorkOrder.findOneAndUpdate(
+            { _id: workOrderId, createdBy: req.user._id },
+            {
+                billId,
+                status: 'completed',
+                completedAt: new Date()
+            },
+            { new: true }
+        ).populate('customer', 'customerName phoneNumber');
+
+        if (!workOrder) {
+            return res.status(404).json({
+                success: false,
+                message: 'Work order not found'
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Work order linked with bill successfully',
+            workOrder
+        });
+    } catch (error) {
+        console.error('Link with bill error:', error.message);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to link work order with bill',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     createWorkOrder,
     getPendingWorkOrders,
     getCompletedWorkOrders,
     getWorkOrder,
+    updateWorkOrder,
     markAsCompleted,
     deleteWorkOrder,
-    getWorkOrdersByCustomer
+    getWorkOrdersByCustomer,
+    linkWithBill
 };

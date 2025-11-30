@@ -28,6 +28,11 @@ const billItemSchema = new mongoose.Schema({
         type: Number,
         required: true
     },
+    // Purchase price at time of billing (for profit calculation)
+    purchasePrice: {
+        type: Number,
+        default: 0  // Services have 0 purchase price
+    },
     amount: {
         type: Number,
         required: true
@@ -90,6 +95,11 @@ const billSchema = new mongoose.Schema({
         type: String,
         enum: ['pending', 'partial', 'paid'],
         default: 'pending'
+    },
+    workOrderId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'WorkOrder',
+        default: null
     },
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,

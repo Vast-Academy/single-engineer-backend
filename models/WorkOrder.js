@@ -10,29 +10,20 @@ const workOrderSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-    workOrderType: {
+    note: {
         type: String,
-        enum: [
-            'CCTV Camera',
-            'Attendance System',
-            'Safe and Locks',
-            'Lift & Elevator Solutions',
-            'Home/Office Automation',
-            'IT & Networking Services',
-            'Software & Website Development',
-            'Custom'
-        ],
-        required: true
+        required: true,
+        trim: true
     },
     scheduleDate: {
         type: Date,
         required: true
     },
-    scheduleTime: {
-        type: String,
-        required: true
+    hasScheduledTime: {
+        type: Boolean,
+        default: false
     },
-    remark: {
+    scheduleTime: {
         type: String,
         default: ''
     },
@@ -48,6 +39,11 @@ const workOrderSchema = new mongoose.Schema({
     notificationSent: {
         type: Boolean,
         default: false
+    },
+    billId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Bill',
+        default: null
     },
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,

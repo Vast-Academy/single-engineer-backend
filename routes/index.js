@@ -9,6 +9,7 @@ const billController = require('../controllers/billController');
 const bankAccountController = require('../controllers/bankAccountController');
 const workOrderController = require('../controllers/workOrderController');
 const notificationController = require('../controllers/notificationController');
+const dashboardController = require('../controllers/dashboardController');
 
 // Middlewares
 const { verifyToken } = require('../middlewares/authMiddleware');
@@ -131,6 +132,9 @@ router.get('/workorders/completed', verifyToken, workOrderController.getComplete
 // GET /api/workorder/:id - Get single work order (Protected)
 router.get('/workorder/:id', verifyToken, workOrderController.getWorkOrder);
 
+// PUT /api/workorder/:id - Update work order details (Protected)
+router.put('/workorder/:id', verifyToken, workOrderController.updateWorkOrder);
+
 // PUT /api/workorder/:id/complete - Mark work order as completed (Protected)
 router.put('/workorder/:id/complete', verifyToken, workOrderController.markAsCompleted);
 
@@ -140,6 +144,9 @@ router.delete('/workorder/:id', verifyToken, workOrderController.deleteWorkOrder
 // GET /api/workorders/customer/:customerId - Get work orders by customer (Protected)
 router.get('/workorders/customer/:customerId', verifyToken, workOrderController.getWorkOrdersByCustomer);
 
+// PUT /api/workorder/link-bill - Link work order with bill (Protected)
+router.put('/workorder/link-bill', verifyToken, workOrderController.linkWithBill);
+
 // ==================== NOTIFICATION ROUTES ====================
 
 // POST /api/notification/register-token - Register FCM token (Protected)
@@ -147,6 +154,11 @@ router.post('/notification/register-token', verifyToken, notificationController.
 
 // POST /api/notification/remove-token - Remove FCM token (Protected)
 router.post('/notification/remove-token', verifyToken, notificationController.removeFcmToken);
+
+// ==================== DASHBOARD ROUTES ====================
+
+// GET /api/dashboard/metrics - Get dashboard metrics (Protected)
+router.get('/dashboard/metrics', verifyToken, dashboardController.getDashboardMetrics);
 
 // ==================== HEALTH CHECK ====================
 
