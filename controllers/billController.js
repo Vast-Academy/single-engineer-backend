@@ -35,6 +35,7 @@ const createBill = async (req, res) => {
 
         // Process items and validate stock
         const processedItems = [];
+        const serializedItemsToUpdate = []; // Track serialized items for customer info update
         let subtotal = 0;
 
         for (const item of items) {
@@ -85,6 +86,12 @@ const createBill = async (req, res) => {
                 // Mark as sold
                 inventoryItem.serialNumbers[serialIndex].status = 'sold';
                 await inventoryItem.save();
+
+                // Track for customer info update after bill creation
+                serializedItemsToUpdate.push({
+                    itemId: inventoryItem._id,
+                    serialNumber: item.serialNumber
+                });
 
                 const amount = inventoryItem.salePrice;
                 processedItems.push({
@@ -170,6 +177,24 @@ const createBill = async (req, res) => {
             workOrderId: workOrderId || null,
             createdBy: req.user._id
         });
+
+        // Update serialized items with customer info and bill number
+        if (serializedItemsToUpdate.length > 0) {
+            for (const serialItem of serializedItemsToUpdate) {
+                await Item.findOneAndUpdate(
+                    {
+                        _id: serialItem.itemId,
+                        'serialNumbers.serialNo': serialItem.serialNumber
+                    },
+                    {
+                        $set: {
+                            'serialNumbers.$.customerName': customer.customerName,
+                            'serialNumbers.$.billNumber': newBill.billNumber
+                        }
+                    }
+                );
+            }
+        }
 
         // If bill created from work order, auto-complete the work order
         if (workOrderId) {

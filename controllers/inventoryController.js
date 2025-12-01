@@ -1,5 +1,6 @@
 const Item = require('../models/Item');
 const Service = require('../models/Service');
+const Bill = require('../models/Bill');
 
 // ==================== SERIAL NUMBER CONTROLLERS ====================
 
@@ -21,13 +22,31 @@ const checkSerialNumber = async (req, res) => {
         });
 
         if (existingItem) {
-            return res.status(200).json({
+            // Find the specific serial number in the array
+            const serial = existingItem.serialNumbers.find(
+                sn => sn.serialNo === serialNumber.trim()
+            );
+
+            const responseData = {
                 success: true,
                 exists: true,
                 message: 'Serial number already exists in stock',
                 itemName: existingItem.itemName,
-                itemId: existingItem._id
-            });
+                itemId: existingItem._id,
+                status: serial?.status || 'available'
+            };
+
+            // If serial is sold, include customer info from serial number
+            if (serial?.status === 'sold') {
+                if (serial.customerName) {
+                    responseData.customerName = serial.customerName;
+                }
+                if (serial.billNumber) {
+                    responseData.billNumber = serial.billNumber;
+                }
+            }
+
+            return res.status(200).json(responseData);
         }
 
         return res.status(200).json({

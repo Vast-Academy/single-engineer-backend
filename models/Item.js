@@ -13,6 +13,15 @@ const serialNumberSchema = new mongoose.Schema({
     addedAt: {
         type: Date,
         default: Date.now
+    },
+    // Customer info when sold
+    customerName: {
+        type: String,
+        default: null
+    },
+    billNumber: {
+        type: String,
+        default: null
     }
 }, { _id: true });
 
