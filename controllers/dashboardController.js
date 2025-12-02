@@ -115,8 +115,8 @@ const getDashboardMetrics = async (req, res) => {
             servicesCollected += proportionalServiceAmount;  // Collected service amount
         }
 
-        // 10. Gross Profit = Net Profit (from items) + Services Collected
-        const grossProfit = netProfit + servicesCollected;
+        // 10. Gross Profit = Net Profit (from items) + Services (full amount)
+        const grossProfit = netProfit + servicesAmount;
 
         // ===== AVAILABLE MONTHS =====
         // Find the earliest bill to determine available months
