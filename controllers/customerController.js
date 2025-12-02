@@ -36,15 +36,36 @@ const addCustomer = async (req, res) => {
     }
 };
 
-// Get all customers
+// Get all customers with due amount
 const getAllCustomers = async (req, res) => {
     try {
-        const customers = await Customer.find({ createdBy: req.user._id })
-            .sort({ createdAt: -1 });
+        const customers = await Customer.find({ createdBy: req.user._id });
+
+        // Calculate due amount for each customer
+        const customersWithDue = await Promise.all(
+            customers.map(async (customer) => {
+                // Get all bills for this customer
+                const bills = await Bill.find({
+                    customer: customer._id,
+                    createdBy: req.user._id
+                });
+
+                // Calculate total due
+                const totalDue = bills.reduce((sum, bill) => sum + bill.dueAmount, 0);
+
+                return {
+                    ...customer.toObject(),
+                    totalDue
+                };
+            })
+        );
+
+        // Sort by totalDue (highest first)
+        customersWithDue.sort((a, b) => b.totalDue - a.totalDue);
 
         return res.status(200).json({
             success: true,
-            customers
+            customers: customersWithDue
         });
     } catch (error) {
         console.error('Get customers error:', error.message);
