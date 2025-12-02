@@ -59,11 +59,13 @@ const getDashboardMetrics = async (req, res) => {
         const outstandingAmount = bills.reduce((sum, bill) => sum + bill.dueAmount, 0);
 
         // 6. Total Expenses (Purchase price of items used - proportional to payment received)
-        // 7. Net Profit (Received Payment - Proportional Expenses)
-        // 8. Services Amount
+        // 7. Net Profit (Items profit only - proportional to payment received)
+        // 8. Services Amount (Total services billed - FULL amount, not proportional)
+        // 9. Services Collected (Services revenue - proportional to payment received, for Gross Profit)
         let totalExpenses = 0;
         let netProfit = 0;
-        let servicesAmount = 0;
+        let servicesAmount = 0;  // Full billed amount
+        let servicesCollected = 0;  // Proportional to payment
 
         // Process each bill and calculate expenses/profit based on received payment
         for (const bill of bills) {
@@ -74,6 +76,7 @@ const getDashboardMetrics = async (req, res) => {
 
             // Calculate bill-level totals first
             let billItemExpense = 0;
+            let billItemRevenue = 0;
             let billServiceAmount = 0;
 
             for (const item of bill.items) {
@@ -91,22 +94,29 @@ const getDashboardMetrics = async (req, res) => {
                     }
 
                     const itemExpense = purchasePrice * item.qty;
+                    const itemRevenue = item.price * item.qty;
+
                     billItemExpense += itemExpense;
+                    billItemRevenue += itemRevenue;
                 }
             }
 
-            // Calculate proportional expense based on payment received
-            const proportionalExpense = billItemExpense * paymentPercentage;
+            // Calculate proportional amounts based on payment received
+            const proportionalItemExpense = billItemExpense * paymentPercentage;
+            const proportionalItemRevenue = billItemRevenue * paymentPercentage;
             const proportionalServiceAmount = billServiceAmount * paymentPercentage;
 
-            // Net profit = what we received - proportional expense
-            totalExpenses += proportionalExpense;
-            servicesAmount += proportionalServiceAmount;
-            netProfit += (bill.receivedPayment - proportionalExpense);
+            // Net profit = Items revenue (proportional) - Items expense (proportional)
+            const itemProfit = proportionalItemRevenue - proportionalItemExpense;
+
+            totalExpenses += billItemExpense;  // Full item expense (not proportional)
+            netProfit += itemProfit;
+            servicesAmount += billServiceAmount;  // Full service amount (not proportional)
+            servicesCollected += proportionalServiceAmount;  // Collected service amount
         }
 
-        // 9. Gross Profit (Net Profit which already includes services revenue)
-        const grossProfit = netProfit;
+        // 10. Gross Profit = Net Profit (from items) + Services Collected
+        const grossProfit = netProfit + servicesCollected;
 
         // ===== AVAILABLE MONTHS =====
         // Find the earliest bill to determine available months
