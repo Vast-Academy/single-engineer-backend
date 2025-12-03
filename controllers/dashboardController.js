@@ -60,7 +60,7 @@ const getDashboardMetrics = async (req, res) => {
 
         // 6. Total Expenses (Full purchase price of items used in all bills)
         // 7. Net Profit (Total Amount Collected - Total Full Expenses)
-        // 8. Services Amount (Total services billed - FULL amount)
+        // 8. Services Amount (Only from fully paid bills, negative for pending bills)
         let totalExpenses = 0;
         let netProfit = 0;
         let servicesAmount = 0;
@@ -96,7 +96,17 @@ const getDashboardMetrics = async (req, res) => {
 
             // Add full expenses
             totalExpenses += billItemExpense;
-            servicesAmount += billServiceAmount;
+
+            // Services logic:
+            // - If bill fully paid (dueAmount = 0): Add as positive (earned)
+            // - If bill has pending due (dueAmount > 0): Add as negative (not earned yet)
+            if (bill.dueAmount === 0) {
+                // Bill fully cleared - services earned
+                servicesAmount += billServiceAmount;
+            } else {
+                // Bill has pending due - services not earned yet (negative)
+                servicesAmount -= billServiceAmount;
+            }
         }
 
         // Net Profit = Total Collected - Total Expenses
