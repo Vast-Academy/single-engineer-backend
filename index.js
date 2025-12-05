@@ -25,7 +25,10 @@ connectDB();
 const allowedOrigins = [
     'http://localhost:3000',
     'https://single-engineer-frontend.vercel.app',
-    process.env.FRONTEND_URL
+    process.env.FRONTEND_URL,
+    'capacitor://localhost',  // Add this for Android
+    'http://localhost',
+    'https://localhost',
 ].filter(Boolean);
 
 app.use(cors({
