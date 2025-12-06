@@ -36,36 +36,85 @@ const addCustomer = async (req, res) => {
     }
 };
 
-// Get all customers with due amount
+// Get all customers with due amount (paginated + aggregated)
 const getAllCustomers = async (req, res) => {
     try {
-        const customers = await Customer.find({ createdBy: req.user._id });
+        const page = Math.max(parseInt(req.query.page) || 1, 1);
+        const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 100);
+        const search = req.query.search ? req.query.search.trim() : '';
+        const skip = (page - 1) * limit;
+        const userId = req.user._id;
 
-        // Calculate due amount for each customer
-        const customersWithDue = await Promise.all(
-            customers.map(async (customer) => {
-                // Get all bills for this customer
-                const bills = await Bill.find({
-                    customer: customer._id,
-                    createdBy: req.user._id
-                });
+        const match = { createdBy: userId };
+        if (search) {
+            match.$or = [
+                { customerName: { $regex: search, $options: 'i' } },
+                { phoneNumber: { $regex: search, $options: 'i' } }
+            ];
+        }
 
-                // Calculate total due
-                const totalDue = bills.reduce((sum, bill) => sum + bill.dueAmount, 0);
-
-                return {
-                    ...customer.toObject(),
-                    totalDue
-                };
-            })
-        );
-
-        // Sort by totalDue (highest first)
-        customersWithDue.sort((a, b) => b.totalDue - a.totalDue);
+        const [customers, total] = await Promise.all([
+            Customer.aggregate([
+                { $match: match },
+                { $sort: { createdAt: -1 } },
+                { $skip: skip },
+                { $limit: limit },
+                // Lookup bills once to compute outstanding
+                {
+                    $lookup: {
+                        from: 'bills',
+                        let: { customerId: '$_id' },
+                        pipeline: [
+                            {
+                                $match: {
+                                    $expr: {
+                                        $and: [
+                                            { $eq: ['$customer', '$$customerId'] },
+                                            { $eq: ['$createdBy', userId] }
+                                        ]
+                                    }
+                                }
+                            },
+                            {
+                                $group: {
+                                    _id: null,
+                                    totalDue: { $sum: '$dueAmount' }
+                                }
+                            }
+                        ],
+                        as: 'billStats'
+                    }
+                },
+                {
+                    $addFields: {
+                        totalDue: {
+                            $ifNull: [{ $arrayElemAt: ['$billStats.totalDue', 0] }, 0]
+                        }
+                    }
+                },
+                {
+                    $project: {
+                        customerName: 1,
+                        phoneNumber: 1,
+                        whatsappNumber: 1,
+                        address: 1,
+                        totalDue: 1,
+                        createdAt: 1
+                    }
+                }
+            ]),
+            Customer.countDocuments(match)
+        ]);
 
         return res.status(200).json({
             success: true,
-            customers: customersWithDue
+            customers,
+            pagination: {
+                page,
+                limit,
+                total,
+                hasMore: skip + customers.length < total
+            }
         });
     } catch (error) {
         console.error('Get customers error:', error.message);

@@ -98,15 +98,69 @@ const addItem = async (req, res) => {
     }
 };
 
-// Get all items
+// Get all items (paginated, lightweight projection)
 const getAllItems = async (req, res) => {
     try {
-        const items = await Item.find({ createdBy: req.user._id })
-            .sort({ createdAt: -1 });
+        const page = Math.max(parseInt(req.query.page) || 1, 1);
+        const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 100);
+        const search = req.query.search ? req.query.search.trim() : '';
+        const skip = (page - 1) * limit;
+
+        const match = { createdBy: req.user._id };
+        if (search) {
+            match.itemName = { $regex: search, $options: 'i' };
+        }
+
+        const [items, total] = await Promise.all([
+            Item.aggregate([
+                { $match: match },
+                { $sort: { createdAt: -1 } },
+                { $skip: skip },
+                { $limit: limit },
+                // Pre-compute counts for serialized items
+                {
+                    $addFields: {
+                        availableSerialCount: {
+                            $size: {
+                                $filter: {
+                                    input: '$serialNumbers',
+                                    as: 'sn',
+                                    cond: { $eq: ['$$sn.status', 'available'] }
+                                }
+                            }
+                        },
+                        serialCount: { $size: '$serialNumbers' }
+                    }
+                },
+                // Keep the response slim
+                {
+                    $project: {
+                        itemType: 1,
+                        itemName: 1,
+                        unit: 1,
+                        warranty: 1,
+                        mrp: 1,
+                        purchasePrice: 1,
+                        salePrice: 1,
+                        stockQty: 1,
+                        availableSerialCount: 1,
+                        serialCount: 1,
+                        createdAt: 1
+                    }
+                }
+            ]),
+            Item.countDocuments(match)
+        ]);
 
         return res.status(200).json({
             success: true,
-            items
+            items,
+            pagination: {
+                page,
+                limit,
+                total,
+                hasMore: skip + items.length < total
+            }
         });
     } catch (error) {
         console.error('Get items error:', error.message);
