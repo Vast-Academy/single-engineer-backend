@@ -99,10 +99,10 @@ const addItem = async (req, res) => {
 };
 
 // Get all items (paginated, lightweight projection)
-const getAllItems = async (req, res) => {
+    const getAllItems = async (req, res) => {
     try {
         const page = Math.max(parseInt(req.query.page) || 1, 1);
-        const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 100);
+        const limit = Math.min(Math.max(parseInt(req.query.limit) || 1, 1), 100);
         const search = req.query.search ? req.query.search.trim() : '';
         const skip = (page - 1) * limit;
 
@@ -392,15 +392,30 @@ const addService = async (req, res) => {
     }
 };
 
-// Get all services
+// Get all services (paginated)
 const getAllServices = async (req, res) => {
     try {
-        const services = await Service.find({ createdBy: req.user._id })
-            .sort({ createdAt: -1 });
+        const page = Math.max(parseInt(req.query.page) || 1, 1);
+        const limit = Math.min(Math.max(parseInt(req.query.limit) || 1, 1), 100);
+        const skip = (page - 1) * limit;
+
+        const [services, total] = await Promise.all([
+            Service.find({ createdBy: req.user._id })
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit),
+            Service.countDocuments({ createdBy: req.user._id })
+        ]);
 
         return res.status(200).json({
             success: true,
-            services
+            services,
+            pagination: {
+                page,
+                limit,
+                total,
+                hasMore: skip + services.length < total
+            }
         });
     } catch (error) {
         console.error('Get services error:', error.message);

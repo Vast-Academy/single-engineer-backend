@@ -86,19 +86,34 @@ const createWorkOrder = async (req, res) => {
     }
 };
 
-// Get all pending work orders
+// Get all pending work orders (paginated)
 const getPendingWorkOrders = async (req, res) => {
     try {
-        const workOrders = await WorkOrder.find({
-            createdBy: req.user._id,
-            status: 'pending'
-        })
-            .populate('customer', 'customerName phoneNumber')
-            .sort({ scheduleDate: 1, scheduleTime: 1 });
+        const page = Math.max(parseInt(req.query.page) || 1, 1);
+        const limit = Math.min(Math.max(parseInt(req.query.limit) || 1, 1), 100);
+        const skip = (page - 1) * limit;
+
+        const [workOrders, total] = await Promise.all([
+            WorkOrder.find({
+                createdBy: req.user._id,
+                status: 'pending'
+            })
+                .populate('customer', 'customerName phoneNumber')
+                .sort({ scheduleDate: 1, scheduleTime: 1 })
+                .skip(skip)
+                .limit(limit),
+            WorkOrder.countDocuments({ createdBy: req.user._id, status: 'pending' })
+        ]);
 
         return res.status(200).json({
             success: true,
-            workOrders
+            workOrders,
+            pagination: {
+                page,
+                limit,
+                total,
+                hasMore: skip + workOrders.length < total
+            }
         });
     } catch (error) {
         console.error('Get pending work orders error:', error.message);
@@ -109,19 +124,34 @@ const getPendingWorkOrders = async (req, res) => {
     }
 };
 
-// Get all completed work orders
+// Get all completed work orders (paginated)
 const getCompletedWorkOrders = async (req, res) => {
     try {
-        const workOrders = await WorkOrder.find({
-            createdBy: req.user._id,
-            status: 'completed'
-        })
-            .populate('customer', 'customerName phoneNumber')
-            .sort({ completedAt: -1 });
+        const page = Math.max(parseInt(req.query.page) || 1, 1);
+        const limit = Math.min(Math.max(parseInt(req.query.limit) || 1, 1), 100);
+        const skip = (page - 1) * limit;
+
+        const [workOrders, total] = await Promise.all([
+            WorkOrder.find({
+                createdBy: req.user._id,
+                status: 'completed'
+            })
+                .populate('customer', 'customerName phoneNumber')
+                .sort({ completedAt: -1 })
+                .skip(skip)
+                .limit(limit),
+            WorkOrder.countDocuments({ createdBy: req.user._id, status: 'completed' })
+        ]);
 
         return res.status(200).json({
             success: true,
-            workOrders
+            workOrders,
+            pagination: {
+                page,
+                limit,
+                total,
+                hasMore: skip + workOrders.length < total
+            }
         });
     } catch (error) {
         console.error('Get completed work orders error:', error.message);

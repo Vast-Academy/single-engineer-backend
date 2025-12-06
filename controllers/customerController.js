@@ -37,10 +37,10 @@ const addCustomer = async (req, res) => {
 };
 
 // Get all customers with due amount (paginated + aggregated)
-const getAllCustomers = async (req, res) => {
+    const getAllCustomers = async (req, res) => {
     try {
         const page = Math.max(parseInt(req.query.page) || 1, 1);
-        const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 100);
+        const limit = Math.min(Math.max(parseInt(req.query.limit) || 1, 1), 100);
         const search = req.query.search ? req.query.search.trim() : '';
         const skip = (page - 1) * limit;
         const userId = req.user._id;
