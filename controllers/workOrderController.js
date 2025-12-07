@@ -69,7 +69,7 @@ const createWorkOrder = async (req, res) => {
 
         // Populate customer data
         const populatedWorkOrder = await WorkOrder.findById(newWorkOrder._id)
-            .populate('customer', 'customerName phoneNumber');
+            .populate('customer', 'customerName phoneNumber address');
 
         return res.status(201).json({
             success: true,
@@ -86,19 +86,37 @@ const createWorkOrder = async (req, res) => {
     }
 };
 
-// Get all pending work orders
+// Get all pending work orders (with pagination)
 const getPendingWorkOrders = async (req, res) => {
     try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 5;
+        const skip = (page - 1) * limit;
+
+        // Get total count
+        const totalCount = await WorkOrder.countDocuments({
+            createdBy: req.user._id,
+            status: 'pending'
+        });
+
         const workOrders = await WorkOrder.find({
             createdBy: req.user._id,
             status: 'pending'
         })
-            .populate('customer', 'customerName phoneNumber')
-            .sort({ scheduleDate: 1, scheduleTime: 1 });
+            .populate('customer', 'customerName phoneNumber address')
+            .sort({ scheduleDate: 1, scheduleTime: 1 })
+            .skip(skip)
+            .limit(limit);
 
         return res.status(200).json({
             success: true,
-            workOrders
+            workOrders,
+            pagination: {
+                currentPage: page,
+                totalPages: Math.ceil(totalCount / limit),
+                totalCount: totalCount,
+                hasMore: page < Math.ceil(totalCount / limit)
+            }
         });
     } catch (error) {
         console.error('Get pending work orders error:', error.message);
@@ -109,19 +127,37 @@ const getPendingWorkOrders = async (req, res) => {
     }
 };
 
-// Get all completed work orders
+// Get all completed work orders (with pagination)
 const getCompletedWorkOrders = async (req, res) => {
     try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 5;
+        const skip = (page - 1) * limit;
+
+        // Get total count
+        const totalCount = await WorkOrder.countDocuments({
+            createdBy: req.user._id,
+            status: 'completed'
+        });
+
         const workOrders = await WorkOrder.find({
             createdBy: req.user._id,
             status: 'completed'
         })
-            .populate('customer', 'customerName phoneNumber')
-            .sort({ completedAt: -1 });
+            .populate('customer', 'customerName phoneNumber address')
+            .sort({ completedAt: -1 })
+            .skip(skip)
+            .limit(limit);
 
         return res.status(200).json({
             success: true,
-            workOrders
+            workOrders,
+            pagination: {
+                currentPage: page,
+                totalPages: Math.ceil(totalCount / limit),
+                totalCount: totalCount,
+                hasMore: page < Math.ceil(totalCount / limit)
+            }
         });
     } catch (error) {
         console.error('Get completed work orders error:', error.message);
@@ -279,7 +315,7 @@ const markAsCompleted = async (req, res) => {
         await workOrder.save();
 
         const updatedWorkOrder = await WorkOrder.findById(id)
-            .populate('customer', 'customerName phoneNumber');
+            .populate('customer', 'customerName phoneNumber address');
 
         return res.status(200).json({
             success: true,
@@ -334,7 +370,7 @@ const getWorkOrdersByCustomer = async (req, res) => {
             customer: customerId,
             createdBy: req.user._id
         })
-            .populate('customer', 'customerName phoneNumber')
+            .populate('customer', 'customerName phoneNumber address')
             .sort({ createdAt: -1 });
 
         return res.status(200).json({
@@ -363,7 +399,7 @@ const linkWithBill = async (req, res) => {
                 completedAt: new Date()
             },
             { new: true }
-        ).populate('customer', 'customerName phoneNumber');
+        ).populate('customer', 'customerName phoneNumber address');
 
         if (!workOrder) {
             return res.status(404).json({
