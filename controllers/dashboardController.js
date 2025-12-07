@@ -2,7 +2,7 @@ const Bill = require('../models/Bill');
 const Item = require('../models/Item');
 const WorkOrder = require('../models/WorkOrder');
 
-// Get dashboard metrics with optimized aggregation
+// Get dashboard metrics
 const getDashboardMetrics = async (req, res) => {
     try {
         const userId = req.user._id;
@@ -10,138 +10,115 @@ const getDashboardMetrics = async (req, res) => {
 
         // Default to current month if not provided
         const currentDate = new Date();
-        month = month ? parseInt(month, 10) : currentDate.getMonth() + 1;
-        year = year ? parseInt(year, 10) : currentDate.getFullYear();
+        month = month ? parseInt(month) : currentDate.getMonth() + 1;
+        year = year ? parseInt(year) : currentDate.getFullYear();
 
         // ===== ALWAYS CURRENT METRICS =====
 
-        // Total stock using aggregation (avoids pulling whole item docs)
-        const stockAgg = await Item.aggregate([
-            { $match: { createdBy: userId } },
-            {
-                $addFields: {
-                    availableSerialCount: {
-                        $size: {
-                            $filter: {
-                                input: '$serialNumbers',
-                                as: 'sn',
-                                cond: { $eq: ['$$sn.status', 'available'] }
-                            }
-                        }
-                    }
-                }
-            },
-            {
-                $group: {
-                    _id: null,
-                    genericStock: {
-                        $sum: {
-                            $cond: [{ $eq: ['$itemType', 'generic'] }, '$stockQty', 0]
-                        }
-                    },
-                    serializedStock: {
-                        $sum: {
-                            $cond: [
-                                { $eq: ['$itemType', 'serialized'] },
-                                '$availableSerialCount',
-                                0
-                            ]
-                        }
-                    }
-                }
-            },
-            {
-                $project: {
-                    _id: 0,
-                    totalStock: { $add: ['$genericStock', '$serializedStock'] }
-                }
-            }
-        ]);
-        const totalStock = stockAgg[0]?.totalStock || 0;
+        // 1. Total Stock (Generic + Serialized)
+        const items = await Item.find({ createdBy: userId });
 
-        // Pending work orders count
+        const genericStock = items
+            .filter(i => i.itemType === 'generic')
+            .reduce((sum, i) => sum + i.stockQty, 0);
+
+        const serializedStock = items
+            .filter(i => i.itemType === 'serialized')
+            .reduce((sum, i) => {
+                const availableCount = i.serialNumbers.filter(sn => sn.status === 'available').length;
+                return sum + availableCount;
+            }, 0);
+
+        const totalStock = genericStock + serializedStock;
+
+        // 2. Pending Work Orders
         const pendingWorkOrders = await WorkOrder.countDocuments({
             createdBy: userId,
             status: 'pending'
-        }).lean();
+        });
 
         // ===== MONTH-WISE METRICS =====
+
+        // Date range for the selected month
         const startOfMonth = new Date(year, month - 1, 1);
         const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
 
-        // Aggregate bill stats in a single pass
-        const billStatsAgg = await Bill.aggregate([
-            {
-                $match: {
-                    createdBy: userId,
-                    createdAt: { $gte: startOfMonth, $lte: endOfMonth }
-                }
-            },
-            {
-                $addFields: {
-                    serviceAmount: {
-                        $reduce: {
-                            input: {
-                                $filter: {
-                                    input: '$items',
-                                    as: 'i',
-                                    cond: { $eq: ['$$i.itemType', 'service'] }
-                                }
-                            },
-                            initialValue: 0,
-                            in: { $add: ['$$value', '$$this.amount'] }
-                        }
-                    },
-                    itemExpense: {
-                        $reduce: {
-                            input: '$items',
-                            initialValue: 0,
-                            in: {
-                                $add: [
-                                    '$$value',
-                                    {
-                                        $cond: [
-                                            { $eq: ['$$this.itemType', 'service'] },
-                                            0,
-                                            { $multiply: ['$$this.purchasePrice', '$$this.qty'] }
-                                        ]
-                                    }
-                                ]
-                            }
-                        }
+        // Get all bills for the selected month
+        const bills = await Bill.find({
+            createdBy: userId,
+            createdAt: { $gte: startOfMonth, $lte: endOfMonth }
+        });
+
+        // 3. Billed Amount
+        const billedAmount = bills.reduce((sum, bill) => sum + bill.totalAmount, 0);
+
+        // 4. Amount Collected
+        const amountCollected = bills.reduce((sum, bill) => sum + bill.receivedPayment, 0);
+
+        // 5. Outstanding Amount
+        const outstandingAmount = bills.reduce((sum, bill) => sum + bill.dueAmount, 0);
+
+        // 6. Total Expenses (Full purchase price of items used in all bills)
+        // 7. Net Profit (Total Amount Collected - Total Full Expenses)
+        // 8. Services Amount (Only from fully paid bills, negative for pending bills)
+        let totalExpenses = 0;
+        let netProfit = 0;
+        let servicesAmount = 0;
+        let totalCollected = 0;  // Track total amount collected
+
+        // Process each bill and calculate expenses
+        for (const bill of bills) {
+            // Track total collected amount
+            totalCollected += bill.receivedPayment;
+
+            // Calculate bill-level totals
+            let billItemExpense = 0;
+            let billServiceAmount = 0;
+
+            for (const item of bill.items) {
+                if (item.itemType === 'service') {
+                    // Services - no purchase cost, pure revenue
+                    billServiceAmount += item.amount;
+                } else {
+                    // Items (generic or serialized)
+                    let purchasePrice = item.purchasePrice;
+
+                    // If purchasePrice is not in bill (old bills), fetch from Item model
+                    if (!purchasePrice || purchasePrice === 0) {
+                        const inventoryItem = await Item.findById(item.itemId).select('purchasePrice');
+                        purchasePrice = inventoryItem ? inventoryItem.purchasePrice : 0;
                     }
-                }
-            },
-            {
-                $group: {
-                    _id: null,
-                    billedAmount: { $sum: '$totalAmount' },
-                    amountCollected: { $sum: '$receivedPayment' },
-                    outstandingAmount: { $sum: '$dueAmount' },
-                    totalExpenses: { $sum: '$itemExpense' },
-                    servicesAmount: {
-                        $sum: {
-                            $cond: [
-                                { $eq: ['$dueAmount', 0] },
-                                '$serviceAmount',
-                                { $multiply: ['$serviceAmount', -1] }
-                            ]
-                        }
-                    }
+
+                    const itemExpense = purchasePrice * item.qty;
+                    billItemExpense += itemExpense;
                 }
             }
-        ]);
 
-        const billStats = billStatsAgg[0] || {};
-        const billedAmount = billStats.billedAmount || 0;
-        const amountCollected = billStats.amountCollected || 0;
-        const outstandingAmount = billStats.outstandingAmount || 0;
-        const totalExpenses = billStats.totalExpenses || 0;
-        const servicesAmount = billStats.servicesAmount || 0;
-        const netProfit = amountCollected - totalExpenses;
+            // Add full expenses
+            totalExpenses += billItemExpense;
+
+            // Services logic:
+            // - If bill fully paid (dueAmount = 0): Add as positive (earned)
+            // - If bill has pending due (dueAmount > 0): Add as negative (not earned yet)
+            if (bill.dueAmount === 0) {
+                // Bill fully cleared - services earned
+                servicesAmount += billServiceAmount;
+            } else {
+                // Bill has pending due - services not earned yet (negative)
+                servicesAmount -= billServiceAmount;
+            }
+        }
+
+        // Net Profit = Total Collected - Total Expenses
+        // If collected < expenses → Loss (negative)
+        // If collected > expenses → Profit (positive)
+        netProfit = totalCollected - totalExpenses;
+
+        // Gross Profit = Net Profit + Services (full amount)
         const grossProfit = netProfit + servicesAmount;
 
         // ===== AVAILABLE MONTHS =====
+        // Find the earliest bill to determine available months
         const earliestBill = await Bill.findOne({ createdBy: userId })
             .sort({ createdAt: 1 })
             .select('createdAt');
@@ -151,6 +128,7 @@ const getDashboardMetrics = async (req, res) => {
             const startDate = new Date(earliestBill.createdAt);
             const endDate = new Date();
 
+            // Generate month list from earliest to current
             let currentMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
             const monthNames = [
                 'January', 'February', 'March', 'April', 'May', 'June',
@@ -168,16 +146,17 @@ const getDashboardMetrics = async (req, res) => {
         }
 
         // ===== PENDING WORK ORDERS (ALL) =====
-        const pendingWorkOrdersList = await WorkOrder.find({
+        // Get all pending work orders sorted by schedule date (earliest first)
+        const allPendingWorkOrders = await WorkOrder.find({
             createdBy: userId,
             status: 'pending'
         })
             .populate('customer', 'customerName phoneNumber address')
             .sort({ scheduleDate: 1, scheduleTime: 1 })
-            .select('workOrderNumber scheduleDate scheduleTime hasScheduledTime note status customer')
-            .lean();
+            .select('workOrderNumber scheduleDate scheduleTime hasScheduledTime note status customer');
 
-        const pendingWorks = pendingWorkOrdersList.map(wo => ({
+        // Map to consistent format
+        const pendingWorks = allPendingWorkOrders.map(wo => ({
             _id: wo._id,
             workOrderNumber: wo.workOrderNumber,
             scheduleDate: wo.scheduleDate,
@@ -193,6 +172,7 @@ const getDashboardMetrics = async (req, res) => {
             }
         }));
 
+        // Return all metrics
         return res.status(200).json({
             success: true,
             data: {
@@ -215,6 +195,7 @@ const getDashboardMetrics = async (req, res) => {
                 pendingWorks
             }
         });
+
     } catch (error) {
         console.error('Get dashboard metrics error:', error.message);
         return res.status(500).json({
