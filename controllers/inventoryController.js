@@ -98,15 +98,30 @@ const addItem = async (req, res) => {
     }
 };
 
-// Get all items
+// Get all items (with pagination)
 const getAllItems = async (req, res) => {
     try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 5;
+        const skip = (page - 1) * limit;
+
+        // Get total count
+        const totalCount = await Item.countDocuments({ createdBy: req.user._id });
+
         const items = await Item.find({ createdBy: req.user._id })
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
 
         return res.status(200).json({
             success: true,
-            items
+            items,
+            pagination: {
+                currentPage: page,
+                totalPages: Math.ceil(totalCount / limit),
+                totalCount: totalCount,
+                hasMore: page < Math.ceil(totalCount / limit)
+            }
         });
     } catch (error) {
         console.error('Get items error:', error.message);
@@ -338,15 +353,30 @@ const addService = async (req, res) => {
     }
 };
 
-// Get all services
+// Get all services (with pagination)
 const getAllServices = async (req, res) => {
     try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 5;
+        const skip = (page - 1) * limit;
+
+        // Get total count
+        const totalCount = await Service.countDocuments({ createdBy: req.user._id });
+
         const services = await Service.find({ createdBy: req.user._id })
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
 
         return res.status(200).json({
             success: true,
-            services
+            services,
+            pagination: {
+                currentPage: page,
+                totalPages: Math.ceil(totalCount / limit),
+                totalCount: totalCount,
+                hasMore: page < Math.ceil(totalCount / limit)
+            }
         });
     } catch (error) {
         console.error('Get services error:', error.message);
