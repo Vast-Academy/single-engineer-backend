@@ -1,7 +1,7 @@
 const WorkOrder = require('../models/WorkOrder');
 const Customer = require('../models/Customer');
 
-// Generate work order number
+// Generate work order number testing
 const generateWorkOrderNumber = async (userId) => {
     const count = await WorkOrder.countDocuments({ createdBy: userId });
     const date = new Date();
