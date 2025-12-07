@@ -347,10 +347,107 @@ const getAllBills = async (req, res) => {
     }
 };
 
+// Pay customer overall due (distributes across oldest bills first)
+const payCustomerDue = async (req, res) => {
+    try {
+        const { customerId } = req.params;
+        const { amount, note } = req.body;
+
+        if (!amount || amount <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Valid payment amount is required'
+            });
+        }
+
+        // Validate customer
+        const customer = await Customer.findOne({ _id: customerId, createdBy: req.user._id });
+        if (!customer) {
+            return res.status(404).json({
+                success: false,
+                message: 'Customer not found'
+            });
+        }
+
+        // Get all bills with due amount > 0, sorted by oldest first (FIFO)
+        const bills = await Bill.find({
+            customer: customerId,
+            createdBy: req.user._id,
+            dueAmount: { $gt: 0 }
+        }).sort({ createdAt: 1 }); // Oldest first
+
+        if (bills.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'No pending bills found for this customer'
+            });
+        }
+
+        // Calculate total due
+        const totalDue = bills.reduce((sum, bill) => sum + bill.dueAmount, 0);
+
+        if (amount > totalDue) {
+            return res.status(400).json({
+                success: false,
+                message: `Amount (₹${amount}) cannot exceed total due (₹${totalDue})`
+            });
+        }
+
+        // Distribute payment across bills (FIFO)
+        let remainingPayment = amount;
+        const affectedBills = [];
+
+        for (const bill of bills) {
+            if (remainingPayment <= 0) break;
+
+            const amountForThisBill = Math.min(bill.dueAmount, remainingPayment);
+
+            // Add to payment history
+            bill.paymentHistory.push({
+                amount: amountForThisBill,
+                paidAt: new Date(),
+                note: note || ''
+            });
+
+            // Update payment amounts
+            bill.receivedPayment += amountForThisBill;
+            bill.dueAmount -= amountForThisBill;
+
+            // Update status
+            if (bill.dueAmount <= 0) {
+                bill.status = 'paid';
+                bill.dueAmount = 0; // Ensure it's exactly 0
+            } else if (bill.receivedPayment > 0) {
+                bill.status = 'partial';
+            }
+
+            await bill.save();
+            affectedBills.push(bill);
+
+            remainingPayment -= amountForThisBill;
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: `Payment of ₹${amount} distributed across ${affectedBills.length} bill(s)`,
+            affectedBills,
+            totalPaid: amount
+        });
+    } catch (error) {
+        console.error('Pay customer due error:', error.message);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to process payment',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     createBill,
     getBillsByCustomer,
     getBill,
     updateBillPayment,
-    getAllBills
+    getAllBills,
+    payCustomerDue
 };

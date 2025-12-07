@@ -101,6 +101,9 @@ router.get('/bill/:id', verifyToken, billController.getBill);
 // PUT /api/bill/:id/payment - Update bill payment (Protected)
 router.put('/bill/:id/payment', verifyToken, billController.updateBillPayment);
 
+// PUT /api/bill/customer/:customerId/pay-due - Pay customer overall due (Protected)
+router.put('/bill/customer/:customerId/pay-due', verifyToken, billController.payCustomerDue);
+
 // ==================== BANK ACCOUNT ROUTES ====================
 
 // POST /api/bank-account - Add new bank account (Protected)
