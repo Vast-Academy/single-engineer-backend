@@ -36,10 +36,20 @@ const addCustomer = async (req, res) => {
     }
 };
 
-// Get all customers with due amount
+// Get all customers with due amount (with pagination)
 const getAllCustomers = async (req, res) => {
     try {
-        const customers = await Customer.find({ createdBy: req.user._id });
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 5;
+        const skip = (page - 1) * limit;
+
+        // Get total count
+        const totalCount = await Customer.countDocuments({ createdBy: req.user._id });
+
+        // Get paginated customers
+        const customers = await Customer.find({ createdBy: req.user._id })
+            .skip(skip)
+            .limit(limit);
 
         // Calculate due amount for each customer
         const customersWithDue = await Promise.all(
@@ -65,7 +75,13 @@ const getAllCustomers = async (req, res) => {
 
         return res.status(200).json({
             success: true,
-            customers: customersWithDue
+            customers: customersWithDue,
+            pagination: {
+                currentPage: page,
+                totalPages: Math.ceil(totalCount / limit),
+                totalCount: totalCount,
+                hasMore: page < Math.ceil(totalCount / limit)
+            }
         });
     } catch (error) {
         console.error('Get customers error:', error.message);
