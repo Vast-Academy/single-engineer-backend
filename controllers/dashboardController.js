@@ -6,12 +6,14 @@ const WorkOrder = require('../models/WorkOrder');
 const getDashboardMetrics = async (req, res) => {
     try {
         const userId = req.user._id;
-        let { month, year } = req.query;
+        let { filterType, period, month, year } = req.query;
 
-        // Default to current month if not provided
+        // Default to period-based filter (1 month) if not provided
+        filterType = filterType || 'period';
+        period = period || '1month';
+
         const currentDate = new Date();
-        month = month ? parseInt(month) : currentDate.getMonth() + 1;
-        year = year ? parseInt(year) : currentDate.getFullYear();
+        let startDate, endDate;
 
         // ===== ALWAYS CURRENT METRICS =====
 
@@ -37,17 +39,72 @@ const getDashboardMetrics = async (req, res) => {
             status: 'pending'
         });
 
+        // ===== DATE RANGE CALCULATION BASED ON FILTER TYPE =====
+
+        if (filterType === 'period') {
+            // Period-based filtering (1 week, 1 month, 3 months, 6 months, 1 year)
+            endDate = new Date();
+            startDate = new Date();
+
+            switch(period) {
+                case '1week':
+                    startDate.setDate(endDate.getDate() - 7);
+                    break;
+                case '1month':
+                    startDate.setDate(endDate.getDate() - 30);
+                    break;
+                case '3months':
+                    startDate.setMonth(endDate.getMonth() - 3);
+                    break;
+                case '6months':
+                    startDate.setMonth(endDate.getMonth() - 6);
+                    break;
+                case '1year':
+                    startDate.setFullYear(endDate.getFullYear() - 1);
+                    break;
+                default:
+                    startDate.setDate(endDate.getDate() - 30); // Default to 1 month
+            }
+
+            // Set start of day for startDate
+            startDate.setHours(0, 0, 0, 0);
+            // Set end of day for endDate
+            endDate.setHours(23, 59, 59, 999);
+
+        } else if (filterType === 'monthYear') {
+            // Month-Year based filtering
+            month = parseInt(month);
+            year = parseInt(year);
+
+            if (!month || !year) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Month and year are required for monthYear filter type'
+                });
+            }
+
+            startDate = new Date(year, month - 1, 1);
+            endDate = new Date(year, month, 0, 23, 59, 59, 999);
+        }
+
         // ===== MONTH-WISE METRICS =====
 
-        // Date range for the selected month
-        const startOfMonth = new Date(year, month - 1, 1);
-        const endOfMonth = new Date(year, month, 0, 23, 59, 59, 999);
+        // Date range for the selected period
 
-        // Get all bills for the selected month
+        // Get all bills for the selected period
         const bills = await Bill.find({
             createdBy: userId,
-            createdAt: { $gte: startOfMonth, $lte: endOfMonth }
+            createdAt: { $gte: startDate, $lte: endDate }
         });
+
+        // Check if no data exists for monthYear filter
+        if (filterType === 'monthYear' && bills.length === 0) {
+            return res.status(200).json({
+                success: true,
+                noData: true,
+                message: 'This month\'s record is not in the database'
+            });
+        }
 
         // 3. Billed Amount
         const billedAmount = bills.reduce((sum, bill) => sum + bill.totalAmount, 0);
@@ -117,25 +174,35 @@ const getDashboardMetrics = async (req, res) => {
         // Gross Profit = Net Profit + Services (full amount)
         const grossProfit = netProfit + servicesAmount;
 
-        // ===== AVAILABLE MONTHS =====
-        // Find the earliest bill to determine available months
+        // ===== AVAILABLE MONTHS AND YEARS =====
+        // Find the earliest bill to determine available months and years
         const earliestBill = await Bill.findOne({ createdBy: userId })
             .sort({ createdAt: 1 })
             .select('createdAt');
 
         const availableMonths = [];
+        const availableYears = [];
+
         if (earliestBill) {
-            const startDate = new Date(earliestBill.createdAt);
-            const endDate = new Date();
+            const earliestDate = new Date(earliestBill.createdAt);
+            const currentDateForCalc = new Date();
+
+            // Generate years list from earliest to current
+            const earliestYear = earliestDate.getFullYear();
+            const currentYear = currentDateForCalc.getFullYear();
+
+            for (let y = earliestYear; y <= currentYear; y++) {
+                availableYears.push(y);
+            }
 
             // Generate month list from earliest to current
-            let currentMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+            let currentMonth = new Date(earliestDate.getFullYear(), earliestDate.getMonth(), 1);
             const monthNames = [
                 'January', 'February', 'March', 'April', 'May', 'June',
                 'July', 'August', 'September', 'October', 'November', 'December'
             ];
 
-            while (currentMonth <= endDate) {
+            while (currentMonth <= currentDateForCalc) {
                 availableMonths.push({
                     month: currentMonth.getMonth() + 1,
                     year: currentMonth.getFullYear(),
@@ -176,13 +243,19 @@ const getDashboardMetrics = async (req, res) => {
         return res.status(200).json({
             success: true,
             data: {
+                filterInfo: {
+                    filterType,
+                    period: filterType === 'period' ? period : null,
+                    month: filterType === 'monthYear' ? month : null,
+                    year: filterType === 'monthYear' ? year : null,
+                    startDate,
+                    endDate
+                },
                 currentMetrics: {
                     totalStock,
                     pendingWorkOrders
                 },
                 monthMetrics: {
-                    month,
-                    year,
                     billedAmount,
                     amountCollected,
                     outstandingAmount,
@@ -192,6 +265,7 @@ const getDashboardMetrics = async (req, res) => {
                     grossProfit
                 },
                 availableMonths,
+                availableYears,
                 pendingWorks
             }
         });
