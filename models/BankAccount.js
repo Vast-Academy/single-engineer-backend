@@ -36,6 +36,10 @@ const bankAccountSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true
+    },
+    deleted: {
+        type: Boolean,
+        default: false
     }
 }, {
     timestamps: true
@@ -44,5 +48,7 @@ const bankAccountSchema = new mongoose.Schema({
 // Index for faster queries
 bankAccountSchema.index({ createdBy: 1 });
 bankAccountSchema.index({ createdBy: 1, isPrimary: 1 });
+bankAccountSchema.index({ updatedAt: -1 });
+bankAccountSchema.index({ deleted: 1, createdBy: 1 });
 
 module.exports = mongoose.model('BankAccount', bankAccountSchema);

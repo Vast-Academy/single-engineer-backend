@@ -49,6 +49,10 @@ const workOrderSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true
+    },
+    deleted: {
+        type: Boolean,
+        default: false
     }
 }, {
     timestamps: true
@@ -60,5 +64,7 @@ workOrderSchema.index({ createdBy: 1 });
 workOrderSchema.index({ status: 1 });
 workOrderSchema.index({ scheduleDate: 1 });
 workOrderSchema.index({ workOrderNumber: 1 });
+workOrderSchema.index({ updatedAt: -1 });
+workOrderSchema.index({ deleted: 1, createdBy: 1 });
 
 module.exports = mongoose.model('WorkOrder', workOrderSchema);

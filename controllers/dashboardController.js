@@ -94,6 +94,7 @@ const getDashboardMetrics = async (req, res) => {
         // Get all bills for the selected period
         const bills = await Bill.find({
             createdBy: userId,
+            deleted: false,
             createdAt: { $gte: startDate, $lte: endDate }
         });
 
@@ -176,7 +177,7 @@ const getDashboardMetrics = async (req, res) => {
 
         // ===== AVAILABLE MONTHS AND YEARS =====
         // Find the earliest bill to determine available months and years
-        const earliestBill = await Bill.findOne({ createdBy: userId })
+        const earliestBill = await Bill.findOne({ createdBy: userId, deleted: false })
             .sort({ createdAt: 1 })
             .select('createdAt');
 
@@ -216,7 +217,8 @@ const getDashboardMetrics = async (req, res) => {
         // Get all pending work orders sorted by schedule date (earliest first)
         const allPendingWorkOrders = await WorkOrder.find({
             createdBy: userId,
-            status: 'pending'
+            status: 'pending',
+            deleted: false
         })
             .populate('customer', 'customerName phoneNumber address')
             .sort({ scheduleDate: 1, scheduleTime: 1 })

@@ -76,6 +76,10 @@ const itemSchema = new mongoose.Schema({
     stockHistory: [stockHistorySchema],
     // For Serialized items
     serialNumbers: [serialNumberSchema],
+    deleted: {
+        type: Boolean,
+        default: false
+    },
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
@@ -105,5 +109,7 @@ itemSchema.index(
         partialFilterExpression: { 'serialNumbers.serialNo': { $type: 'string' } }
     }
 );
+itemSchema.index({ updatedAt: -1 });
+itemSchema.index({ deleted: 1, createdBy: 1 });
 
 module.exports = mongoose.model('Item', itemSchema);

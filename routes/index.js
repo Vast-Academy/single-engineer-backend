@@ -10,6 +10,7 @@ const bankAccountController = require('../controllers/bankAccountController');
 const workOrderController = require('../controllers/workOrderController');
 const notificationController = require('../controllers/notificationController');
 const dashboardController = require('../controllers/dashboardController');
+const syncController = require('../controllers/syncController');
 
 // Middlewares
 const { verifyToken } = require('../middlewares/authMiddleware');
@@ -162,6 +163,14 @@ router.post('/notification/remove-token', verifyToken, notificationController.re
 
 // GET /api/dashboard/metrics - Get dashboard metrics (Protected)
 router.get('/dashboard/metrics', verifyToken, dashboardController.getDashboardMetrics);
+
+// ==================== SYNC ROUTES (Offline support scaffolding) ====================
+
+// POST /api/sync/pull - Pull incremental changes (Protected)
+router.post('/sync/pull', verifyToken, syncController.pullChanges);
+
+// POST /api/sync/push - Push batched local changes (Protected)
+router.post('/sync/push', verifyToken, syncController.pushChanges);
 
 // ==================== HEALTH CHECK ====================
 

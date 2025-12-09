@@ -47,7 +47,7 @@ const getAllCustomers = async (req, res) => {
         const totalCount = await Customer.countDocuments({ createdBy: req.user._id });
 
         // Get paginated customers
-        const customers = await Customer.find({ createdBy: req.user._id })
+        const customers = await Customer.find({ createdBy: req.user._id, deleted: false })
             .skip(skip)
             .limit(limit);
 
@@ -97,7 +97,7 @@ const getCustomer = async (req, res) => {
     try {
         const { id } = req.params;
 
-        const customer = await Customer.findOne({ _id: id, createdBy: req.user._id });
+        const customer = await Customer.findOne({ _id: id, createdBy: req.user._id, deleted: false });
 
         if (!customer) {
             return res.status(404).json({
@@ -107,7 +107,7 @@ const getCustomer = async (req, res) => {
         }
 
         // Get bills for this customer
-        const bills = await Bill.find({ customer: id, createdBy: req.user._id })
+        const bills = await Bill.find({ customer: id, createdBy: req.user._id, deleted: false })
             .sort({ createdAt: -1 });
 
         // Calculate totals
@@ -142,7 +142,7 @@ const updateCustomer = async (req, res) => {
         const { customerName, phoneNumber, whatsappNumber, address } = req.body;
 
         const customer = await Customer.findOneAndUpdate(
-            { _id: id, createdBy: req.user._id },
+            { _id: id, createdBy: req.user._id, deleted: false },
             { customerName, phoneNumber, whatsappNumber, address },
             { new: true }
         );
@@ -174,7 +174,7 @@ const deleteCustomer = async (req, res) => {
         const { id } = req.params;
 
         // Check if customer has bills
-        const billCount = await Bill.countDocuments({ customer: id });
+        const billCount = await Bill.countDocuments({ customer: id, deleted: false });
         if (billCount > 0) {
             return res.status(400).json({
                 success: false,
@@ -182,7 +182,11 @@ const deleteCustomer = async (req, res) => {
             });
         }
 
-        const customer = await Customer.findOneAndDelete({ _id: id, createdBy: req.user._id });
+        const customer = await Customer.findOneAndUpdate(
+            { _id: id, createdBy: req.user._id, deleted: false },
+            { deleted: true },
+            { new: true }
+        );
 
         if (!customer) {
             return res.status(404).json({
@@ -218,6 +222,7 @@ const searchCustomers = async (req, res) => {
 
         const customers = await Customer.find({
             createdBy: req.user._id,
+            deleted: false,
             $or: [
                 { customerName: { $regex: q, $options: 'i' } },
                 { phoneNumber: { $regex: q, $options: 'i' } }

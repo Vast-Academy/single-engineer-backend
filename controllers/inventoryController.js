@@ -19,7 +19,7 @@ const checkSerialNumber = async (req, res) => {
         // Check if serial number exists in any item
         const existingItem = await Item.findOne({
             'serialNumbers.serialNo': serialNumber.trim()
-        });
+        }).where({ deleted: false });
 
         if (existingItem) {
             // Find the specific serial number in the array
@@ -106,9 +106,9 @@ const getAllItems = async (req, res) => {
         const skip = (page - 1) * limit;
 
         // Get total count
-        const totalCount = await Item.countDocuments({ createdBy: req.user._id });
+        const totalCount = await Item.countDocuments({ createdBy: req.user._id, deleted: false });
 
-        const items = await Item.find({ createdBy: req.user._id })
+        const items = await Item.find({ createdBy: req.user._id, deleted: false })
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit);
@@ -137,7 +137,7 @@ const getItem = async (req, res) => {
     try {
         const { id } = req.params;
 
-        const item = await Item.findOne({ _id: id, createdBy: req.user._id });
+        const item = await Item.findOne({ _id: id, createdBy: req.user._id, deleted: false });
 
         if (!item) {
             return res.status(404).json({
@@ -166,7 +166,7 @@ const updateItem = async (req, res) => {
         const { itemName, unit, warranty, mrp, purchasePrice, salePrice } = req.body;
 
         const item = await Item.findOneAndUpdate(
-            { _id: id, createdBy: req.user._id },
+            { _id: id, createdBy: req.user._id, deleted: false },
             { itemName, unit, warranty, mrp, purchasePrice, salePrice },
             { new: true }
         );
@@ -197,7 +197,11 @@ const deleteItem = async (req, res) => {
     try {
         const { id } = req.params;
 
-        const item = await Item.findOneAndDelete({ _id: id, createdBy: req.user._id });
+        const item = await Item.findOneAndUpdate(
+            { _id: id, createdBy: req.user._id, deleted: false },
+            { deleted: true },
+            { new: true }
+        );
 
         if (!item) {
             return res.status(404).json({
@@ -225,7 +229,7 @@ const updateStock = async (req, res) => {
         const { id } = req.params;
         const { stockQty, serialNumbers } = req.body;
 
-        const item = await Item.findOne({ _id: id, createdBy: req.user._id });
+        const item = await Item.findOne({ _id: id, createdBy: req.user._id, deleted: false });
 
         if (!item) {
             return res.status(404).json({
@@ -276,7 +280,7 @@ const updateStock = async (req, res) => {
                 // Check for duplicates across ALL items in database
                 const existingItems = await Item.find({
                     'serialNumbers.serialNo': { $in: trimmedSerials }
-                });
+                }).where({ deleted: false });
 
                 const existingSerials = [];
                 existingItems.forEach(existingItem => {
@@ -361,9 +365,9 @@ const getAllServices = async (req, res) => {
         const skip = (page - 1) * limit;
 
         // Get total count
-        const totalCount = await Service.countDocuments({ createdBy: req.user._id });
+        const totalCount = await Service.countDocuments({ createdBy: req.user._id, deleted: false });
 
-        const services = await Service.find({ createdBy: req.user._id })
+        const services = await Service.find({ createdBy: req.user._id, deleted: false })
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit);
@@ -394,7 +398,7 @@ const updateService = async (req, res) => {
         const { serviceName, servicePrice } = req.body;
 
         const service = await Service.findOneAndUpdate(
-            { _id: id, createdBy: req.user._id },
+            { _id: id, createdBy: req.user._id, deleted: false },
             { serviceName, servicePrice },
             { new: true }
         );
@@ -425,7 +429,11 @@ const deleteService = async (req, res) => {
     try {
         const { id } = req.params;
 
-        const service = await Service.findOneAndDelete({ _id: id, createdBy: req.user._id });
+        const service = await Service.findOneAndUpdate(
+            { _id: id, createdBy: req.user._id, deleted: false },
+            { deleted: true },
+            { new: true }
+        );
 
         if (!service) {
             return res.status(404).json({

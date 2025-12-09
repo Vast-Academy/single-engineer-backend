@@ -16,7 +16,7 @@ const createWorkOrder = async (req, res) => {
         const { customerId, note, scheduleDate, hasScheduledTime, scheduleTime } = req.body;
 
         // Validate customer
-        const customer = await Customer.findOne({ _id: customerId, createdBy: req.user._id });
+        const customer = await Customer.findOne({ _id: customerId, createdBy: req.user._id, deleted: false });
         if (!customer) {
             return res.status(404).json({
                 success: false,
@@ -96,12 +96,14 @@ const getPendingWorkOrders = async (req, res) => {
         // Get total count
         const totalCount = await WorkOrder.countDocuments({
             createdBy: req.user._id,
-            status: 'pending'
+            status: 'pending',
+            deleted: false
         });
 
         const workOrders = await WorkOrder.find({
             createdBy: req.user._id,
-            status: 'pending'
+            status: 'pending',
+            deleted: false
         })
             .populate('customer', 'customerName phoneNumber address')
             .sort({ scheduleDate: 1, scheduleTime: 1 })
@@ -137,12 +139,14 @@ const getCompletedWorkOrders = async (req, res) => {
         // Get total count
         const totalCount = await WorkOrder.countDocuments({
             createdBy: req.user._id,
-            status: 'completed'
+            status: 'completed',
+            deleted: false
         });
 
         const workOrders = await WorkOrder.find({
             createdBy: req.user._id,
-            status: 'completed'
+            status: 'completed',
+            deleted: false
         })
             .populate('customer', 'customerName phoneNumber address')
             .sort({ completedAt: -1 })
@@ -175,7 +179,8 @@ const getWorkOrder = async (req, res) => {
 
         const workOrder = await WorkOrder.findOne({
             _id: id,
-            createdBy: req.user._id
+            createdBy: req.user._id,
+            deleted: false
         }).populate('customer', 'customerName phoneNumber address');
 
         if (!workOrder) {
@@ -206,7 +211,8 @@ const updateWorkOrder = async (req, res) => {
 
         const workOrder = await WorkOrder.findOne({
             _id: id,
-            createdBy: req.user._id
+            createdBy: req.user._id,
+            deleted: false
         });
 
         if (!workOrder) {
@@ -293,7 +299,8 @@ const markAsCompleted = async (req, res) => {
 
         const workOrder = await WorkOrder.findOne({
             _id: id,
-            createdBy: req.user._id
+            createdBy: req.user._id,
+            deleted: false
         });
 
         if (!workOrder) {
@@ -336,10 +343,13 @@ const deleteWorkOrder = async (req, res) => {
     try {
         const { id } = req.params;
 
-        const workOrder = await WorkOrder.findOneAndDelete({
+        const workOrder = await WorkOrder.findOneAndUpdate({
             _id: id,
-            createdBy: req.user._id
-        });
+            createdBy: req.user._id,
+            deleted: false
+        }, {
+            deleted: true
+        }, { new: true });
 
         if (!workOrder) {
             return res.status(404).json({
@@ -368,7 +378,8 @@ const getWorkOrdersByCustomer = async (req, res) => {
 
         const workOrders = await WorkOrder.find({
             customer: customerId,
-            createdBy: req.user._id
+            createdBy: req.user._id,
+            deleted: false
         })
             .populate('customer', 'customerName phoneNumber address')
             .sort({ createdAt: -1 });
@@ -392,7 +403,7 @@ const linkWithBill = async (req, res) => {
         const { workOrderId, billId } = req.body;
 
         const workOrder = await WorkOrder.findOneAndUpdate(
-            { _id: workOrderId, createdBy: req.user._id },
+            { _id: workOrderId, createdBy: req.user._id, deleted: false },
             {
                 billId,
                 status: 'completed',

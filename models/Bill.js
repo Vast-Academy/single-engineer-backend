@@ -105,6 +105,10 @@ const billSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true
+    },
+    deleted: {
+        type: Boolean,
+        default: false
     }
 }, {
     timestamps: true
@@ -115,5 +119,7 @@ billSchema.index({ customer: 1 });
 billSchema.index({ createdBy: 1 });
 billSchema.index({ billNumber: 1 });
 billSchema.index({ status: 1 });
+billSchema.index({ updatedAt: -1 });
+billSchema.index({ deleted: 1, createdBy: 1 });
 
 module.exports = mongoose.model('Bill', billSchema);

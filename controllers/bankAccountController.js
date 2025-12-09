@@ -22,7 +22,7 @@ const addBankAccount = async (req, res) => {
         }
 
         // Check if this is the first account (make it primary by default)
-        const existingCount = await BankAccount.countDocuments({ createdBy: req.user._id });
+        const existingCount = await BankAccount.countDocuments({ createdBy: req.user._id, deleted: false });
         const shouldBePrimary = isPrimary || existingCount === 0;
 
         const bankAccount = await BankAccount.create({
@@ -53,7 +53,7 @@ const addBankAccount = async (req, res) => {
 // Get all bank accounts
 const getAllBankAccounts = async (req, res) => {
     try {
-        const bankAccounts = await BankAccount.find({ createdBy: req.user._id })
+        const bankAccounts = await BankAccount.find({ createdBy: req.user._id, deleted: false })
             .sort({ isPrimary: -1, createdAt: -1 });
 
         return res.status(200).json({
@@ -75,7 +75,7 @@ const updateBankAccount = async (req, res) => {
         const { id } = req.params;
         const { bankName, accountNumber, ifscCode, accountHolderName, upiId, isPrimary } = req.body;
 
-        const bankAccount = await BankAccount.findOne({ _id: id, createdBy: req.user._id });
+        const bankAccount = await BankAccount.findOne({ _id: id, createdBy: req.user._id, deleted: false });
 
         if (!bankAccount) {
             return res.status(404).json({
@@ -122,7 +122,11 @@ const deleteBankAccount = async (req, res) => {
     try {
         const { id } = req.params;
 
-        const bankAccount = await BankAccount.findOneAndDelete({ _id: id, createdBy: req.user._id });
+        const bankAccount = await BankAccount.findOneAndUpdate(
+            { _id: id, createdBy: req.user._id, deleted: false },
+            { deleted: true },
+            { new: true }
+        );
 
         if (!bankAccount) {
             return res.status(404).json({
@@ -159,7 +163,7 @@ const setPrimaryAccount = async (req, res) => {
     try {
         const { id } = req.params;
 
-        const bankAccount = await BankAccount.findOne({ _id: id, createdBy: req.user._id });
+        const bankAccount = await BankAccount.findOne({ _id: id, createdBy: req.user._id, deleted: false });
 
         if (!bankAccount) {
             return res.status(404).json({

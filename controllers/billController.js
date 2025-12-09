@@ -18,7 +18,7 @@ const createBill = async (req, res) => {
         const { customerId, items, discount, receivedPayment, paymentMethod, workOrderId } = req.body;
 
         // Validate customer
-        const customer = await Customer.findOne({ _id: customerId, createdBy: req.user._id });
+        const customer = await Customer.findOne({ _id: customerId, createdBy: req.user._id, deleted: false });
         if (!customer) {
             return res.status(404).json({
                 success: false,
@@ -41,7 +41,7 @@ const createBill = async (req, res) => {
         for (const item of items) {
             if (item.itemType === 'service') {
                 // Service
-                const service = await Service.findOne({ _id: item.itemId, createdBy: req.user._id });
+                const service = await Service.findOne({ _id: item.itemId, createdBy: req.user._id, deleted: false });
                 if (!service) {
                     return res.status(404).json({
                         success: false,
@@ -63,7 +63,7 @@ const createBill = async (req, res) => {
 
             } else if (item.itemType === 'serialized') {
                 // Serialized item
-                const inventoryItem = await Item.findOne({ _id: item.itemId, createdBy: req.user._id });
+                const inventoryItem = await Item.findOne({ _id: item.itemId, createdBy: req.user._id, deleted: false });
                 if (!inventoryItem) {
                     return res.status(404).json({
                         success: false,
@@ -108,7 +108,7 @@ const createBill = async (req, res) => {
 
             } else if (item.itemType === 'generic') {
                 // Generic item
-                const inventoryItem = await Item.findOne({ _id: item.itemId, createdBy: req.user._id });
+                const inventoryItem = await Item.findOne({ _id: item.itemId, createdBy: req.user._id, deleted: false });
                 if (!inventoryItem) {
                     return res.status(404).json({
                         success: false,
@@ -226,7 +226,7 @@ const getBillsByCustomer = async (req, res) => {
     try {
         const { customerId } = req.params;
 
-        const bills = await Bill.find({ customer: customerId, createdBy: req.user._id })
+        const bills = await Bill.find({ customer: customerId, createdBy: req.user._id, deleted: false })
             .sort({ createdAt: -1 });
 
         return res.status(200).json({
@@ -247,7 +247,7 @@ const getBill = async (req, res) => {
     try {
         const { id } = req.params;
 
-        const bill = await Bill.findOne({ _id: id, createdBy: req.user._id })
+        const bill = await Bill.findOne({ _id: id, createdBy: req.user._id, deleted: false })
             .populate('customer', 'customerName phoneNumber');
 
         if (!bill) {
@@ -283,7 +283,7 @@ const updateBillPayment = async (req, res) => {
             });
         }
 
-        const bill = await Bill.findOne({ _id: id, createdBy: req.user._id });
+        const bill = await Bill.findOne({ _id: id, createdBy: req.user._id, deleted: false });
 
         if (!bill) {
             return res.status(404).json({
@@ -330,7 +330,7 @@ const updateBillPayment = async (req, res) => {
 // Get all bills (for dashboard/reports)
 const getAllBills = async (req, res) => {
     try {
-        const bills = await Bill.find({ createdBy: req.user._id })
+        const bills = await Bill.find({ createdBy: req.user._id, deleted: false })
             .populate('customer', 'customerName phoneNumber')
             .sort({ createdAt: -1 });
 
@@ -361,7 +361,7 @@ const payCustomerDue = async (req, res) => {
         }
 
         // Validate customer
-        const customer = await Customer.findOne({ _id: customerId, createdBy: req.user._id });
+        const customer = await Customer.findOne({ _id: customerId, createdBy: req.user._id, deleted: false });
         if (!customer) {
             return res.status(404).json({
                 success: false,
@@ -373,7 +373,8 @@ const payCustomerDue = async (req, res) => {
         const bills = await Bill.find({
             customer: customerId,
             createdBy: req.user._id,
-            dueAmount: { $gt: 0 }
+            dueAmount: { $gt: 0 },
+            deleted: false
         }).sort({ createdAt: 1 }); // Oldest first
 
         if (bills.length === 0) {
