@@ -3,8 +3,19 @@ const User = require('../models/User');
 
 const verifyToken = async (req, res, next) => {
     try {
-        // Get token from cookie
-        const token = req.cookies.authToken;
+        let token;
+
+        // Try to get token from Authorization header first (for native apps)
+        const authHeader = req.headers.authorization;
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            token = authHeader.substring(7); // Remove 'Bearer ' prefix
+            console.log('Using Authorization Bearer token');
+        }
+        // Fall back to cookie (for web browsers)
+        else if (req.cookies.authToken) {
+            token = req.cookies.authToken;
+            console.log('Using cookie token');
+        }
 
         if (!token) {
             return res.status(401).json({
