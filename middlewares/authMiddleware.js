@@ -2,37 +2,20 @@ const admin = require('../config/firebase-admin');
 const User = require('../models/User');
 
 /**
- * Strict authentication middleware
+ * Authentication middleware (Authorization header only)
  *
- * Verifies Firebase ID tokens from either:
- * 1. Authorization: Bearer <token> header (native apps)
- * 2. authToken cookie (web browsers)
- *
- * Rejects all requests without valid authentication.
+ * - Accepts ONLY Authorization: Bearer <idToken>
+ * - No cookie fallback
+ * - verifyIdToken without revoke check
  */
 const verifyToken = async (req, res, next) => {
     const requestPath = req.path;
     const requestMethod = req.method;
 
     try {
-        let token;
-        let tokenSource;
-
-        // Try to get token from Authorization header first (for native apps)
-        const authHeader = req.headers.authorization;
-        if (authHeader && authHeader.startsWith('Bearer ')) {
-            token = authHeader.substring(7); // Remove 'Bearer ' prefix
-            tokenSource = 'Authorization Bearer';
-        }
-        // Fall back to cookie (for web browsers)
-        else if (req.cookies.authToken) {
-            token = req.cookies.authToken;
-            tokenSource = 'Cookie';
-        }
-
-        // STRICT: No token = immediate rejection
-        if (!token) {
-            console.warn(`❌ [AUTH BLOCKED] ${requestMethod} ${requestPath} - No token provided`);
+        const authHeader = req.headers.authorization || '';
+        if (!authHeader.startsWith('Bearer ')) {
+            console.warn(`[AUTH BLOCKED] ${requestMethod} ${requestPath} - No Authorization Bearer token`);
             return res.status(401).json({
                 success: false,
                 message: 'Authentication required. No token provided.',
@@ -40,36 +23,42 @@ const verifyToken = async (req, res, next) => {
             });
         }
 
-        // Verify Firebase ID token
+        const token = authHeader.substring(7);
+        if (!token) {
+            console.warn(`[AUTH BLOCKED] ${requestMethod} ${requestPath} - No token provided after parsing header`);
+            return res.status(401).json({
+                success: false,
+                message: 'Authentication required. No token provided.',
+                code: 'NO_TOKEN'
+            });
+        }
+
+        // Verify Firebase ID token (no revoke check)
         let decodedToken;
         try {
-            decodedToken = await admin.auth().verifyIdToken(token, true); // checkRevoked = true
+            decodedToken = await admin.auth().verifyIdToken(token);
         } catch (firebaseError) {
-            // More specific Firebase errors
             if (firebaseError.code === 'auth/id-token-expired') {
-                console.warn(`❌ [AUTH BLOCKED] ${requestMethod} ${requestPath} - Token expired`);
+                console.warn(`[AUTH BLOCKED] ${requestMethod} ${requestPath} - Token expired`);
                 return res.status(401).json({
                     success: false,
                     message: 'Authentication token expired. Please refresh.',
                     code: 'TOKEN_EXPIRED'
                 });
             }
-            if (firebaseError.code === 'auth/id-token-revoked') {
-                console.warn(`❌ [AUTH BLOCKED] ${requestMethod} ${requestPath} - Token revoked`);
-                return res.status(401).json({
-                    success: false,
-                    message: 'Authentication token revoked. Please login again.',
-                    code: 'TOKEN_REVOKED'
-                });
-            }
-            throw firebaseError; // Other Firebase errors
+
+            console.warn(`[AUTH BLOCKED] ${requestMethod} ${requestPath} - Invalid token ${firebaseError.code || ''}`);
+            return res.status(401).json({
+                success: false,
+                message: 'Authentication failed. Invalid token.',
+                code: 'AUTH_ERROR'
+            });
         }
 
-        // Find user in database
+        // Ensure user exists and active
         const user = await User.findOne({ firebaseUid: decodedToken.uid });
-
         if (!user) {
-            console.warn(`❌ [AUTH BLOCKED] ${requestMethod} ${requestPath} - User not found for UID: ${decodedToken.uid}`);
+            console.warn(`[AUTH BLOCKED] ${requestMethod} ${requestPath} - User not found for UID: ${decodedToken.uid}`);
             return res.status(401).json({
                 success: false,
                 message: 'User account not found.',
@@ -77,9 +66,8 @@ const verifyToken = async (req, res, next) => {
             });
         }
 
-        // Check if account is active
         if (!user.isActive) {
-            console.warn(`❌ [AUTH BLOCKED] ${requestMethod} ${requestPath} - Account deactivated: ${user.email}`);
+            console.warn(`[AUTH BLOCKED] ${requestMethod} ${requestPath} - Account deactivated: ${user.email}`);
             return res.status(403).json({
                 success: false,
                 message: 'Account is deactivated. Please contact support.',
@@ -87,18 +75,16 @@ const verifyToken = async (req, res, next) => {
             });
         }
 
-        // Success - Attach user to request object
         req.user = user;
         req.firebaseUser = decodedToken;
 
-        console.log(`✓ [AUTH OK] ${requestMethod} ${requestPath} - User: ${user.email} (${tokenSource})`);
+        console.log(`[AUTH OK] ${requestMethod} ${requestPath} - User: ${user.email} (Authorization Bearer)`);
         next();
-
     } catch (error) {
-        console.error(`❌ [AUTH ERROR] ${requestMethod} ${requestPath} - ${error.message}`);
+        console.error(`[AUTH ERROR] ${requestMethod} ${requestPath} - ${error.message}`);
         return res.status(401).json({
             success: false,
-            message: 'Authentication failed. Invalid token.',
+            message: 'Authentication failed.',
             code: 'AUTH_ERROR'
         });
     }

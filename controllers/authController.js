@@ -1,14 +1,6 @@
 const admin = require('../config/firebase-admin');
 const User = require('../models/User');
 
-// Cookie configuration
-const cookieOptions = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-};
-
 // Google Sign In / Sign Up
 const googleAuth = async (req, res) => {
     try {
@@ -43,9 +35,6 @@ const googleAuth = async (req, res) => {
             user.photoURL = picture || user.photoURL;
             await user.save();
         }
-
-        // Set auth token in HTTP-only cookie
-        res.cookie('authToken', idToken, cookieOptions);
 
         return res.status(200).json({
             success: true,
@@ -93,13 +82,6 @@ const getCurrentUser = async (req, res) => {
 // Logout user
 const logout = async (req, res) => {
     try {
-        // Clear the auth cookie
-        res.clearCookie('authToken', {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
-        });
-
         return res.status(200).json({
             success: true,
             message: 'Logged out successfully.'
