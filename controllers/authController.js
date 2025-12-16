@@ -1,5 +1,6 @@
 const admin = require('../config/firebase-admin');
 const User = require('../models/User');
+const bcrypt = require('bcrypt');
 
 // Google Sign In / Sign Up
 const googleAuth = async (req, res) => {
@@ -43,7 +44,8 @@ const googleAuth = async (req, res) => {
                 id: user._id,
                 email: user.email,
                 displayName: user.displayName,
-                photoURL: user.photoURL
+                photoURL: user.photoURL,
+                isPasswordSet: user.isPasswordSet
             }
         });
     } catch (error) {
@@ -67,7 +69,8 @@ const getCurrentUser = async (req, res) => {
                 id: user._id,
                 email: user.email,
                 displayName: user.displayName,
-                photoURL: user.photoURL
+                photoURL: user.photoURL,
+                isPasswordSet: user.isPasswordSet
             }
         });
     } catch (error) {
@@ -95,8 +98,129 @@ const logout = async (req, res) => {
     }
 };
 
+// Set/Update Password
+const setPassword = async (req, res) => {
+    try {
+        const { password, confirmPassword } = req.body;
+        const user = req.user; // from verifyToken middleware
+
+        // Validation
+        if (!password || !confirmPassword) {
+            return res.status(400).json({
+                success: false,
+                message: 'All fields are required'
+            });
+        }
+
+        if (password.length < 6) {
+            return res.status(400).json({
+                success: false,
+                message: 'Password must be at least 6 characters'
+            });
+        }
+
+        if (password !== confirmPassword) {
+            return res.status(400).json({
+                success: false,
+                message: 'Password and confirm password do not match'
+            });
+        }
+
+        // Hash password
+        const saltRounds = 10;
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+        // Update user record
+        user.password = hashedPassword;
+        user.isPasswordSet = true;
+        await user.save();
+
+        console.log('Password set successfully for user:', user.email);
+
+        return res.status(200).json({
+            success: true,
+            message: 'Password set successfully'
+        });
+    } catch (error) {
+        console.error('Set password error:', error.message);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to set password'
+        });
+    }
+};
+
+// Email/Password Login
+const emailPasswordLogin = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        // Validation
+        if (!email || !password) {
+            return res.status(400).json({
+                success: false,
+                message: 'All fields are required'
+            });
+        }
+
+        // Find user by email
+        const user = await User.findOne({ email: email.toLowerCase() });
+
+        if (!user) {
+            return res.status(401).json({
+                success: false,
+                message: 'User not found or invalid credentials'
+            });
+        }
+
+        // Check if password is set
+        if (!user.isPasswordSet || !user.password) {
+            return res.status(400).json({
+                success: false,
+                message: 'Password not set. Please use Google Sign In'
+            });
+        }
+
+        // Compare password
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+
+        if (!isPasswordValid) {
+            return res.status(401).json({
+                success: false,
+                message: 'User not found or invalid credentials'
+            });
+        }
+
+        // Generate Firebase custom token
+        const customToken = await admin.auth().createCustomToken(user.firebaseUid);
+
+        console.log('Email/password login successful:', user.email);
+
+        return res.status(200).json({
+            success: true,
+            message: 'Login successful',
+            customToken: customToken,
+            user: {
+                id: user._id,
+                email: user.email,
+                displayName: user.displayName,
+                photoURL: user.photoURL,
+                isPasswordSet: user.isPasswordSet
+            }
+        });
+    } catch (error) {
+        console.error('Email/password login error:', error.message);
+        return res.status(500).json({
+            success: false,
+            message: 'Login failed'
+        });
+    }
+};
+
 module.exports = {
     googleAuth,
     getCurrentUser,
-    logout
+    logout,
+    setPassword,
+    emailPasswordLogin
 };

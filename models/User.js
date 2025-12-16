@@ -23,6 +23,14 @@ const userSchema = new mongoose.Schema({
         type: String,
         default: ''
     },
+    password: {
+        type: String,
+        default: null  // null means password not set yet
+    },
+    isPasswordSet: {
+        type: Boolean,
+        default: false
+    },
     role: {
         type: String,
         default: 'engineer'

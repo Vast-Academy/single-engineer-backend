@@ -26,6 +26,12 @@ router.get('/auth/me', verifyToken, authController.getCurrentUser);
 // POST /api/auth/logout - Logout user (Protected)
 router.post('/auth/logout', verifyToken, authController.logout);
 
+// POST /api/auth/set-password - Set user password (Protected)
+router.post('/auth/set-password', verifyToken, authController.setPassword);
+
+// POST /api/auth/login - Email/Password login (Public)
+router.post('/auth/login', authController.emailPasswordLogin);
+
 // ==================== INVENTORY ROUTES - SERIAL NUMBER ====================
 
 // GET /api/inventory/check-serial/:serialNumber - Check if serial exists (Protected)
