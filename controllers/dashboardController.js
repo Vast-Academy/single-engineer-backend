@@ -117,20 +117,18 @@ const getDashboardMetrics = async (req, res) => {
         const outstandingAmount = bills.reduce((sum, bill) => sum + bill.dueAmount, 0);
 
         // 6. Total Expenses (Full purchase price of items used in all bills)
-        // 7. Net Profit (Total Amount Collected - Total Full Expenses)
-        // 8. Services Amount (Only from fully paid bills, negative for pending bills)
+        // 7. Net Profit (Item margin only: item revenue - item expenses)
+        // 8. Services Amount (Add only when received payment >= item margin, else negative)
         let totalExpenses = 0;
         let netProfit = 0;
         let servicesAmount = 0;
-        let totalCollected = 0;  // Track total amount collected
+        let totalItemRevenue = 0;
 
         // Process each bill and calculate expenses
         for (const bill of bills) {
-            // Track total collected amount
-            totalCollected += bill.receivedPayment;
-
             // Calculate bill-level totals
             let billItemExpense = 0;
+            let billItemRevenue = 0;
             let billServiceAmount = 0;
 
             for (const item of bill.items) {
@@ -138,6 +136,7 @@ const getDashboardMetrics = async (req, res) => {
                     // Services - no purchase cost, pure revenue
                     billServiceAmount += item.amount;
                 } else {
+                    billItemRevenue += item.amount;
                     // Items (generic or serialized)
                     let purchasePrice = item.purchasePrice;
 
@@ -154,25 +153,26 @@ const getDashboardMetrics = async (req, res) => {
 
             // Add full expenses
             totalExpenses += billItemExpense;
+            totalItemRevenue += billItemRevenue;
+
+            const billItemMargin = billItemRevenue - billItemExpense;
 
             // Services logic:
-            // - If bill fully paid (dueAmount = 0): Add as positive (earned)
-            // - If bill has pending due (dueAmount > 0): Add as negative (not earned yet)
-            if (bill.dueAmount === 0) {
-                // Bill fully cleared - services earned
+            // - If received payment covers item margin: Add as positive (earned)
+            // - If received payment is below item margin: Add as negative (not earned yet)
+            if (bill.receivedPayment >= billItemMargin) {
+                // Item margin covered - services earned
                 servicesAmount += billServiceAmount;
             } else {
-                // Bill has pending due - services not earned yet (negative)
+                // Item margin not covered - services not earned yet (negative)
                 servicesAmount -= billServiceAmount;
             }
         }
 
-        // Net Profit = Total Collected - Total Expenses
-        // If collected < expenses → Loss (negative)
-        // If collected > expenses → Profit (positive)
-        netProfit = totalCollected - totalExpenses;
+        // Net Profit = Item Revenue - Item Expenses
+        netProfit = totalItemRevenue - totalExpenses;
 
-        // Gross Profit = Net Profit + Services (full amount)
+        // Gross Profit = Net Profit + Services (conditional)
         const grossProfit = netProfit + servicesAmount;
 
         // ===== AVAILABLE MONTHS AND YEARS =====
@@ -285,3 +285,4 @@ const getDashboardMetrics = async (req, res) => {
 module.exports = {
     getDashboardMetrics
 };
+
