@@ -117,12 +117,12 @@ const getDashboardMetrics = async (req, res) => {
         const outstandingAmount = bills.reduce((sum, bill) => sum + bill.dueAmount, 0);
 
         // 6. Total Expenses (Full purchase price of items used in all bills)
-        // 7. Net Profit (Item margin only: item revenue - item expenses)
+        // 7. Net Profit (Items only, based on received payment)
         // 8. Services Amount (Add only when received payment >= item margin, else negative)
         let totalExpenses = 0;
         let netProfit = 0;
         let servicesAmount = 0;
-        let totalItemRevenue = 0;
+        let totalItemCollected = 0;
 
         // Process each bill and calculate expenses
         for (const bill of bills) {
@@ -153,9 +153,10 @@ const getDashboardMetrics = async (req, res) => {
 
             // Add full expenses
             totalExpenses += billItemExpense;
-            totalItemRevenue += billItemRevenue;
 
             const billItemMargin = billItemRevenue - billItemExpense;
+            const receivedForItems = Math.min(bill.receivedPayment, billItemRevenue);
+            totalItemCollected += receivedForItems;
 
             // Services logic:
             // - If received payment covers item margin: Add as positive (earned)
@@ -169,8 +170,8 @@ const getDashboardMetrics = async (req, res) => {
             }
         }
 
-        // Net Profit = Item Revenue - Item Expenses
-        netProfit = totalItemRevenue - totalExpenses;
+        // Net Profit = Received (items only) - Item Expenses
+        netProfit = totalItemCollected - totalExpenses;
 
         // Gross Profit = Net Profit + Services (conditional)
         const grossProfit = netProfit + servicesAmount;
