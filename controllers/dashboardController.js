@@ -159,13 +159,13 @@ const getDashboardMetrics = async (req, res) => {
             totalItemCollected += receivedForItems;
 
             // Services logic:
-            // - If received payment covers item margin: Add as positive (earned)
-            // - If received payment is below item margin: Add as negative (not earned yet)
-            if (bill.receivedPayment >= billItemMargin) {
-                // Item margin covered - services earned
+            // - If received payment covers full item revenue: Add as positive (earned)
+            // - If received payment is below item revenue: Add as negative (not earned yet)
+            if (bill.receivedPayment >= billItemRevenue) {
+                // Item revenue covered - services earned
                 servicesAmount += billServiceAmount;
             } else {
-                // Item margin not covered - services not earned yet (negative)
+                // Item revenue not covered - services not earned yet (negative)
                 servicesAmount -= billServiceAmount;
             }
         }
