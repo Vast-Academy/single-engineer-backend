@@ -159,11 +159,11 @@ const getDashboardMetrics = async (req, res) => {
             totalItemCollected += receivedForItems;
 
             // Services logic:
-            // - Earn services when the full bill (items + services) is collected
-            // - Otherwise keep services at 0 (no negative hold)
-            if (bill.receivedPayment >= bill.totalAmount) {
-                servicesAmount += billServiceAmount;
-            }
+            // - Earn services progressively after item revenue is fully collected.
+            // - Earned service = max(0, min(received - itemRevenue, serviceAmount))
+            // - No negatives; unearned portion stays out.
+            const serviceEarned = Math.max(0, Math.min(bill.receivedPayment - billItemRevenue, billServiceAmount));
+            servicesAmount += serviceEarned;
         }
 
         // Net Profit = Received (items only) - Item Expenses
