@@ -159,14 +159,10 @@ const getDashboardMetrics = async (req, res) => {
             totalItemCollected += receivedForItems;
 
             // Services logic:
-            // - If received payment covers full item revenue: Add as positive (earned)
-            // - If received payment is below item revenue: Add as negative (not earned yet)
+            // - Earn services when full item revenue is collected
+            // - Otherwise keep services at 0 (no negative hold)
             if (bill.receivedPayment >= billItemRevenue) {
-                // Item revenue covered - services earned
                 servicesAmount += billServiceAmount;
-            } else {
-                // Item revenue not covered - services not earned yet (negative)
-                servicesAmount -= billServiceAmount;
             }
         }
 
