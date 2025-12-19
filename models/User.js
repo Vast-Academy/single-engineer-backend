@@ -31,6 +31,41 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
+    // Business Profile Fields
+    businessProfile: {
+        businessName: {
+            type: String,
+            default: ''
+        },
+        ownerName: {
+            type: String,
+            default: ''
+        },
+        address: {
+            type: String,
+            default: ''
+        },
+        state: {
+            type: String,
+            default: ''
+        },
+        city: {
+            type: String,
+            default: ''
+        },
+        pincode: {
+            type: String,
+            default: ''
+        },
+        isComplete: {
+            type: Boolean,
+            default: false
+        },
+        completedAt: {
+            type: Date,
+            default: null
+        }
+    },
     role: {
         type: String,
         default: 'engineer'

@@ -32,6 +32,12 @@ router.post('/auth/set-password', verifyToken, authController.setPassword);
 // POST /api/auth/login - Email/Password login (Public)
 router.post('/auth/login', authController.emailPasswordLogin);
 
+// GET /api/business-profile - Get business profile (Protected)
+router.get('/business-profile', verifyToken, authController.getBusinessProfile);
+
+// PUT /api/business-profile - Update business profile (Protected)
+router.put('/business-profile', verifyToken, authController.updateBusinessProfile);
+
 // ==================== INVENTORY ROUTES - SERIAL NUMBER ====================
 
 // GET /api/inventory/check-serial/:serialNumber - Check if serial exists (Protected)

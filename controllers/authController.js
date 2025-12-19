@@ -70,7 +70,17 @@ const getCurrentUser = async (req, res) => {
                 email: user.email,
                 displayName: user.displayName,
                 photoURL: user.photoURL,
-                isPasswordSet: user.isPasswordSet
+                isPasswordSet: user.isPasswordSet,
+                businessProfile: user.businessProfile || {
+                    businessName: '',
+                    ownerName: '',
+                    address: '',
+                    state: '',
+                    city: '',
+                    pincode: '',
+                    isComplete: false,
+                    completedAt: null
+                }
             }
         });
     } catch (error) {
@@ -217,10 +227,97 @@ const emailPasswordLogin = async (req, res) => {
     }
 };
 
+// Get Business Profile
+const getBusinessProfile = async (req, res) => {
+    try {
+        const user = req.user;
+
+        return res.status(200).json({
+            success: true,
+            data: user.businessProfile || {
+                businessName: '',
+                ownerName: '',
+                address: '',
+                state: '',
+                city: '',
+                pincode: '',
+                isComplete: false,
+                completedAt: null
+            }
+        });
+    } catch (error) {
+        console.error('Get business profile error:', error.message);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to fetch business profile'
+        });
+    }
+};
+
+// Update Business Profile
+const updateBusinessProfile = async (req, res) => {
+    try {
+        const { businessName, ownerName, address, state, city, pincode } = req.body;
+
+        // Validation
+        if (!businessName?.trim() || !ownerName?.trim() || !address?.trim() ||
+            !state?.trim() || !city?.trim() || !pincode?.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: 'All fields are required'
+            });
+        }
+
+        // Validate pincode (6 digits)
+        if (!/^\d{6}$/.test(pincode.trim())) {
+            return res.status(400).json({
+                success: false,
+                message: 'Pincode must be 6 digits'
+            });
+        }
+
+        // Check profile completion
+        const isComplete = true; // All fields are required, so if we reach here, it's complete
+
+        const user = await User.findByIdAndUpdate(
+            req.user._id,
+            {
+                businessProfile: {
+                    businessName: businessName.trim(),
+                    ownerName: ownerName.trim(),
+                    address: address.trim(),
+                    state: state.trim(),
+                    city: city.trim(),
+                    pincode: pincode.trim(),
+                    isComplete,
+                    completedAt: isComplete ? new Date() : null
+                }
+            },
+            { new: true, runValidators: true }
+        );
+
+        console.log('Business profile updated for user:', user.email);
+
+        return res.status(200).json({
+            success: true,
+            message: 'Business profile updated successfully',
+            data: user.businessProfile
+        });
+    } catch (error) {
+        console.error('Update business profile error:', error.message);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to update business profile'
+        });
+    }
+};
+
 module.exports = {
     googleAuth,
     getCurrentUser,
     logout,
     setPassword,
-    emailPasswordLogin
+    emailPasswordLogin,
+    getBusinessProfile,
+    updateBusinessProfile
 };
