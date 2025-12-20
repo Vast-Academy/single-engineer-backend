@@ -45,7 +45,17 @@ const googleAuth = async (req, res) => {
                 email: user.email,
                 displayName: user.displayName,
                 photoURL: user.photoURL,
-                isPasswordSet: user.isPasswordSet
+                isPasswordSet: user.isPasswordSet,
+                businessProfile: user.businessProfile || {
+                    businessName: '',
+                    ownerName: '',
+                    address: '',
+                    state: '',
+                    city: '',
+                    pincode: '',
+                    isComplete: false,
+                    completedAt: null
+                }
             }
         });
     } catch (error) {
