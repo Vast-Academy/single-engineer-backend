@@ -111,8 +111,27 @@ const logout = async (req, res) => {
 // Set/Update Password
 const setPassword = async (req, res) => {
     try {
-        const { password, confirmPassword } = req.body;
+        const { password, confirmPassword, currentPassword } = req.body;
         const user = req.user; // from verifyToken middleware
+
+        // If user already has password set, verify current password
+        if (user.isPasswordSet && user.password) {
+            if (!currentPassword) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Current password is required'
+                });
+            }
+
+            // Verify current password
+            const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+            if (!isCurrentPasswordValid) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Current password is incorrect'
+                });
+            }
+        }
 
         // Validation
         if (!password || !confirmPassword) {
@@ -156,6 +175,51 @@ const setPassword = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: 'Failed to set password'
+        });
+    }
+};
+
+// Verify Current Password
+const verifyCurrentPassword = async (req, res) => {
+    try {
+        const { currentPassword } = req.body;
+        const user = req.user; // from verifyToken middleware
+
+        // Validation
+        if (!currentPassword) {
+            return res.status(400).json({
+                success: false,
+                message: 'Current password is required'
+            });
+        }
+
+        // Check if user has password set
+        if (!user.isPasswordSet || !user.password) {
+            return res.status(400).json({
+                success: false,
+                message: 'No password set for this account'
+            });
+        }
+
+        // Verify password
+        const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+
+        if (!isPasswordValid) {
+            return res.status(401).json({
+                success: false,
+                message: 'Wrong password'
+            });
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Password verified successfully'
+        });
+    } catch (error) {
+        console.error('Verify current password error:', error.message);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to verify password'
         });
     }
 };
@@ -317,6 +381,7 @@ module.exports = {
     getCurrentUser,
     logout,
     setPassword,
+    verifyCurrentPassword,
     emailPasswordLogin,
     getBusinessProfile,
     updateBusinessProfile

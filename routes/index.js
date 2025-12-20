@@ -29,6 +29,9 @@ router.post('/auth/logout', verifyToken, authController.logout);
 // POST /api/auth/set-password - Set user password (Protected)
 router.post('/auth/set-password', verifyToken, authController.setPassword);
 
+// POST /api/auth/verify-current-password - Verify current password (Protected)
+router.post('/auth/verify-current-password', verifyToken, authController.verifyCurrentPassword);
+
 // POST /api/auth/login - Email/Password login (Public)
 router.post('/auth/login', authController.emailPasswordLogin);
 
