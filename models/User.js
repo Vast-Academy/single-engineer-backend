@@ -31,6 +31,19 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
+    // Password Reset Fields
+    resetPasswordOTP: {
+        type: String,
+        default: null
+    },
+    resetPasswordOTPExpires: {
+        type: Date,
+        default: null
+    },
+    resetPasswordOTPAttempts: {
+        type: Number,
+        default: 0
+    },
     // Business Profile Fields
     businessProfile: {
         businessName: {

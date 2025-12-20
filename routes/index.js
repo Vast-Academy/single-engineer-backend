@@ -35,6 +35,11 @@ router.post('/auth/verify-current-password', verifyToken, authController.verifyC
 // POST /api/auth/login - Email/Password login (Public)
 router.post('/auth/login', authController.emailPasswordLogin);
 
+// Forgot Password Routes (Public - no auth required)
+router.post('/auth/forgot-password/send-otp', authController.sendPasswordResetOTP);
+router.post('/auth/forgot-password/verify-otp', authController.verifyPasswordResetOTP);
+router.post('/auth/forgot-password/reset', authController.resetPasswordWithOTP);
+
 // GET /api/business-profile - Get business profile (Protected)
 router.get('/business-profile', verifyToken, authController.getBusinessProfile);
 
