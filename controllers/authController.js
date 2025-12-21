@@ -53,6 +53,7 @@ const googleAuth = async (req, res) => {
                     state: '',
                     city: '',
                     pincode: '',
+                    phone: '',
                     isComplete: false,
                     completedAt: null
                 }
@@ -88,6 +89,7 @@ const getCurrentUser = async (req, res) => {
                     state: '',
                     city: '',
                     pincode: '',
+                    phone: '',
                     isComplete: false,
                     completedAt: null
                 }
@@ -315,6 +317,7 @@ const getBusinessProfile = async (req, res) => {
                 state: '',
                 city: '',
                 pincode: '',
+                phone: '',
                 isComplete: false,
                 completedAt: null
             }
@@ -331,11 +334,11 @@ const getBusinessProfile = async (req, res) => {
 // Update Business Profile
 const updateBusinessProfile = async (req, res) => {
     try {
-        const { businessName, ownerName, address, state, city, pincode } = req.body;
+        const { businessName, ownerName, address, state, city, pincode, phone } = req.body;
 
         // Validation
         if (!businessName?.trim() || !ownerName?.trim() || !address?.trim() ||
-            !state?.trim() || !city?.trim() || !pincode?.trim()) {
+            !state?.trim() || !city?.trim() || !pincode?.trim() || !phone?.trim()) {
             return res.status(400).json({
                 success: false,
                 message: 'All fields are required'
@@ -347,6 +350,15 @@ const updateBusinessProfile = async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: 'Pincode must be 6 digits'
+            });
+        }
+
+        // Validate phone (10 digits, allow spaces/dashes/parentheses)
+        const cleanPhone = phone.trim().replace(/[\s\-\+\(\)]/g, '');
+        if (!/^\d{10}$/.test(cleanPhone)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Phone must be 10 digits'
             });
         }
 
@@ -363,6 +375,7 @@ const updateBusinessProfile = async (req, res) => {
                     state: state.trim(),
                     city: city.trim(),
                     pincode: pincode.trim(),
+                    phone: phone.trim(),
                     isComplete,
                     completedAt: isComplete ? new Date() : null
                 }

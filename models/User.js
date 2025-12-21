@@ -70,6 +70,10 @@ const userSchema = new mongoose.Schema({
             type: String,
             default: ''
         },
+        phone: {
+            type: String,
+            default: ''
+        },
         isComplete: {
             type: Boolean,
             default: false
