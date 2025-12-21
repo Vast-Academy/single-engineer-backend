@@ -11,6 +11,7 @@ const workOrderController = require('../controllers/workOrderController');
 const notificationController = require('../controllers/notificationController');
 const dashboardController = require('../controllers/dashboardController');
 const syncController = require('../controllers/syncController');
+const supportController = require('../controllers/supportController');
 
 // Middlewares
 const { verifyToken } = require('../middlewares/authMiddleware');
@@ -191,6 +192,11 @@ router.post('/sync/pull', verifyToken, syncController.pullChanges);
 
 // POST /api/sync/push - Push batched local changes (Protected)
 router.post('/sync/push', verifyToken, syncController.pushChanges);
+
+// ==================== HELP & SUPPORT ROUTES ====================
+
+// POST /api/support/submit-ticket - Submit support ticket (Protected)
+router.post('/support/submit-ticket', verifyToken, supportController.submitSupportTicket);
 
 // ==================== HEALTH CHECK ====================
 
