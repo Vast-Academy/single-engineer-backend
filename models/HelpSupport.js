@@ -41,7 +41,7 @@ const helpSupportSchema = new mongoose.Schema({
 });
 
 // Generate unique ticket number (e.g., TICK-20251221-0001)
-helpSupportSchema.pre('save', async function(next) {
+helpSupportSchema.pre('save', async function() {
   if (this.isNew) {
     const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const count = await this.constructor.countDocuments({
@@ -49,7 +49,7 @@ helpSupportSchema.pre('save', async function(next) {
     });
     this.ticketNumber = `TICK-${date}-${String(count + 1).padStart(4, '0')}`;
   }
-  next();
+  // No need to call next() in async functions
 });
 
 const HelpSupport = mongoose.model('HelpSupport', helpSupportSchema);
