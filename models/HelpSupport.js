@@ -9,7 +9,7 @@ const helpSupportSchema = new mongoose.Schema({
   ticketNumber: {
     type: String,
     unique: true,
-    required: true
+    required: false  // Auto-generated in pre-save hook
   },
   // User Information
   ownerName: String,
