@@ -193,6 +193,9 @@ router.post('/sync/pull', verifyToken, syncController.pullChanges);
 // POST /api/sync/push - Push batched local changes (Protected)
 router.post('/sync/push', verifyToken, syncController.pushChanges);
 
+// GET /api/sync/has-data - Check if user has any server data (Protected)
+router.get('/sync/has-data', verifyToken, syncController.hasServerData);
+
 // ==================== HELP & SUPPORT ROUTES ====================
 
 // POST /api/support/submit-ticket - Submit support ticket (Protected)
