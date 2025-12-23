@@ -74,6 +74,10 @@ const userSchema = new mongoose.Schema({
             type: String,
             default: ''
         },
+        hidePhoneOnBills: {
+            type: Boolean,
+            default: false
+        },
         isComplete: {
             type: Boolean,
             default: false

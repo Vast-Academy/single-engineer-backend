@@ -334,7 +334,7 @@ const getBusinessProfile = async (req, res) => {
 // Update Business Profile
 const updateBusinessProfile = async (req, res) => {
     try {
-        const { businessName, ownerName, address, state, city, pincode, phone } = req.body;
+        const { businessName, ownerName, address, state, city, pincode, phone, hidePhoneOnBills } = req.body;
 
         // Validation
         if (!businessName?.trim() || !ownerName?.trim() || !address?.trim() ||
@@ -376,6 +376,7 @@ const updateBusinessProfile = async (req, res) => {
                     city: city.trim(),
                     pincode: pincode.trim(),
                     phone: phone.trim(),
+                    hidePhoneOnBills: hidePhoneOnBills || false,
                     isComplete,
                     completedAt: isComplete ? new Date() : null
                 }
