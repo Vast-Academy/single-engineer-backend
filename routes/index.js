@@ -47,6 +47,14 @@ router.get('/business-profile', verifyToken, authController.getBusinessProfile);
 // PUT /api/business-profile - Update business profile (Protected)
 router.put('/business-profile', verifyToken, authController.updateBusinessProfile);
 
+// ==================== USER ROUTES ====================
+
+// POST /api/user/verify-password - Verify user password (Protected)
+router.post('/user/verify-password', verifyToken, authController.verifyPassword);
+
+// DELETE /api/user/delete-account - Delete user account (Protected)
+router.delete('/user/delete-account', verifyToken, authController.deleteAccount);
+
 // ==================== INVENTORY ROUTES - SERIAL NUMBER ====================
 
 // GET /api/inventory/check-serial/:serialNumber - Check if serial exists (Protected)

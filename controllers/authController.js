@@ -638,6 +638,125 @@ const resetPasswordWithOTP = async (req, res) => {
     }
 };
 
+// Verify Password for Account Deletion
+const verifyPassword = async (req, res) => {
+    try {
+        const { password } = req.body;
+
+        if (!password) {
+            return res.status(400).json({
+                success: false,
+                message: 'Password is required'
+            });
+        }
+
+        const user = await User.findById(req.user._id);
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        if (!user.password || !user.isPasswordSet) {
+            return res.status(400).json({
+                success: false,
+                message: 'Password not set for this account'
+            });
+        }
+
+        const isMatch = await bcrypt.compare(password, user.password);
+
+        return res.status(200).json({
+            success: true,
+            isValid: isMatch
+        });
+    } catch (error) {
+        console.error('Verify password error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Error verifying password'
+        });
+    }
+};
+
+// Delete User Account
+const deleteAccount = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const { password } = req.body;
+
+        // Find user
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found'
+            });
+        }
+
+        // Verify password one more time for security
+        if (user.password && user.isPasswordSet) {
+            if (!password) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Password is required'
+                });
+            }
+
+            const isMatch = await bcrypt.compare(password, user.password);
+            if (!isMatch) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid password'
+                });
+            }
+        }
+
+        // Import models
+        const Customer = require('../models/Customer');
+        const Item = require('../models/Item');
+        const Service = require('../models/Service');
+        const WorkOrder = require('../models/WorkOrder');
+        const Bill = require('../models/Bill');
+        const BankAccount = require('../models/BankAccount');
+
+        // Delete all user data from database
+        await Promise.all([
+            Customer.deleteMany({ createdBy: userId }),
+            Item.deleteMany({ createdBy: userId }),
+            Service.deleteMany({ createdBy: userId }),
+            WorkOrder.deleteMany({ createdBy: userId }),
+            Bill.deleteMany({ createdBy: userId }),
+            BankAccount.deleteMany({ createdBy: userId })
+        ]);
+
+        // Delete user account
+        await User.findByIdAndDelete(userId);
+
+        // Clear session cookie
+        res.clearCookie('token', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict'
+        });
+
+        console.log('Account deleted successfully for user:', user.email);
+
+        return res.status(200).json({
+            success: true,
+            message: 'Account deleted successfully'
+        });
+    } catch (error) {
+        console.error('Delete account error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to delete account'
+        });
+    }
+};
+
 module.exports = {
     googleAuth,
     getCurrentUser,
@@ -649,5 +768,7 @@ module.exports = {
     updateBusinessProfile,
     sendPasswordResetOTP,
     verifyPasswordResetOTP,
-    resetPasswordWithOTP
+    resetPasswordWithOTP,
+    verifyPassword,
+    deleteAccount
 };
