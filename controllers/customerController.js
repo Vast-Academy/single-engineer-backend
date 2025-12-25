@@ -13,6 +13,19 @@ const addCustomer = async (req, res) => {
             });
         }
 
+        // Check for duplicate phone number for the same user
+        const existingCustomer = await Customer.findOne({ 
+            phoneNumber, 
+            createdBy: req.user._id 
+        });
+
+        if (existingCustomer) {
+            return res.status(409).json({
+                success: false,
+                message: 'A customer with this phone number already exists.'
+            });
+        }
+
         const newCustomer = await Customer.create({
             customerName,
             phoneNumber,
@@ -28,6 +41,12 @@ const addCustomer = async (req, res) => {
         });
     } catch (error) {
         console.error('Add customer error:', error.message);
+        if (error.code === 11000) { // Handle potential race condition with unique index
+            return res.status(409).json({
+                success: false,
+                message: 'A customer with this phone number already exists.'
+            });
+        }
         return res.status(500).json({
             success: false,
             message: 'Failed to add customer',
