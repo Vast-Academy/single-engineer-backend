@@ -77,15 +77,14 @@ const sendWorkOrderReminders = async () => {
         const currentHour = now.getHours();
         const currentMinutes = now.getMinutes();
 
-        // Format current time for comparison (e.g., "10:00 AM")
-        const formatTime = (hour, minutes) => {
-            const h = hour % 12 || 12;
+        // Format current time for comparison (24-hour "HH:MM")
+        const formatTime24 = (hour, minutes) => {
+            const h = hour.toString().padStart(2, '0');
             const m = minutes.toString().padStart(2, '0');
-            const ampm = hour >= 12 ? 'PM' : 'AM';
-            return `${h.toString().padStart(2, '0')}:${m} ${ampm}`;
+            return `${h}:${m}`;
         };
 
-        const currentTimeStr = formatTime(currentHour, currentMinutes);
+        const currentTimeStr = formatTime24(currentHour, currentMinutes);
 
         // Find pending work orders scheduled for today at current time (only with scheduled time)
         const today = new Date();
