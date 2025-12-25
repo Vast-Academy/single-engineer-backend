@@ -43,6 +43,22 @@ const sendNotification = async (userId, title, body, data = {}) => {
             }
         }
 
+        if (response.successCount > 0) {
+            const successTokens = [];
+            response.responses.forEach((resp, idx) => {
+                if (resp.success) {
+                    successTokens.push(tokens[idx]);
+                }
+            });
+            if (successTokens.length > 0) {
+                await User.updateOne(
+                    { _id: userId },
+                    { $set: { 'fcmTokens.$[t].lastSeenAt': new Date() } },
+                    { arrayFilters: [{ 't.token': { $in: successTokens } }] }
+                );
+            }
+        }
+
         return {
             success: true,
             successCount: response.successCount,
@@ -94,7 +110,7 @@ const sendWorkOrderReminders = async () => {
             await sendNotification(
                 workOrder.createdBy,
                 'Work Order Reminder',
-                `${workOrder.note} for ${workOrder.customer?.customerName || 'Customer'} is scheduled now!`,
+                `${workOrder.customer?.customerName || 'Customer'}\n${workOrder.note}`,
                 {
                     workOrderId: workOrder._id.toString(),
                     type: 'work_order_reminder'
@@ -113,54 +129,23 @@ const sendWorkOrderReminders = async () => {
     }
 };
 
-// Send reminder 30 minutes before
-const sendUpcomingReminders = async () => {
+// Cleanup old/unused FCM tokens
+const purgeOldFcmTokens = async (days = 60) => {
     try {
-        const now = new Date();
-        const reminderTime = new Date(now.getTime() + 30 * 60 * 1000); // 30 minutes from now
-        const reminderHour = reminderTime.getHours();
-        const reminderMinutes = Math.floor(reminderTime.getMinutes() / 30) * 30; // Round to nearest 30 min
-
-        const formatTime = (hour, minutes) => {
-            const h = hour % 12 || 12;
-            const m = minutes.toString().padStart(2, '0');
-            const ampm = hour >= 12 ? 'PM' : 'AM';
-            return `${h.toString().padStart(2, '0')}:${m} ${ampm}`;
-        };
-
-        const targetTimeStr = formatTime(reminderHour, reminderMinutes);
-
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-
-        // Find work orders scheduled in ~30 minutes (only with scheduled time)
-        const upcomingWorkOrders = await WorkOrder.find({
-            status: 'pending',
-            hasScheduledTime: true,  // Only work orders with scheduled time
-            scheduleDate: {
-                $gte: today,
-                $lt: tomorrow
-            },
-            scheduleTime: targetTimeStr
-        }).populate('customer', 'customerName phoneNumber');
-
-        for (const workOrder of upcomingWorkOrders) {
-            await sendNotification(
-                workOrder.createdBy,
-                'Upcoming Work Order',
-                `${workOrder.note} for ${workOrder.customer?.customerName || 'Customer'} in 30 minutes!`,
-                {
-                    workOrderId: workOrder._id.toString(),
-                    type: 'work_order_upcoming'
+        const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+        const result = await User.updateMany({}, {
+            $pull: {
+                fcmTokens: {
+                    $or: [
+                        { lastSeenAt: { $lt: cutoff } },
+                        { lastSeenAt: { $exists: false }, createdAt: { $lt: cutoff } }
+                    ]
                 }
-            );
-        }
-
-        return { success: true, notified: upcomingWorkOrders.length };
+            }
+        });
+        return { success: true, modifiedCount: result.modifiedCount || 0 };
     } catch (error) {
-        console.error('Send upcoming reminders error:', error);
+        console.error('Purge FCM tokens error:', error);
         return { success: false, message: error.message };
     }
 };
@@ -168,5 +153,5 @@ const sendUpcomingReminders = async () => {
 module.exports = {
     sendNotification,
     sendWorkOrderReminders,
-    sendUpcomingReminders
+    purgeOldFcmTokens
 };

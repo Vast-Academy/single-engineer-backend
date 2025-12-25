@@ -229,6 +229,11 @@ const updateWorkOrder = async (req, res) => {
             });
         }
 
+        const originalScheduleDate = workOrder.scheduleDate;
+        const originalHasScheduledTime = workOrder.hasScheduledTime;
+        const originalScheduleTime = workOrder.scheduleTime || '';
+        let scheduleChanged = false;
+
         // Validate note (mandatory)
         if (note !== undefined) {
             if (!note || note.trim().length === 0) {
@@ -252,12 +257,18 @@ const updateWorkOrder = async (req, res) => {
                     message: 'Schedule date cannot be in the past'
                 });
             }
+            if (!originalScheduleDate || scheduleDateObj.getTime() !== originalScheduleDate.getTime()) {
+                scheduleChanged = true;
+            }
             workOrder.scheduleDate = scheduleDateObj;
         }
 
         // Update time settings
         if (hasScheduledTime !== undefined) {
             workOrder.hasScheduledTime = hasScheduledTime;
+            if (hasScheduledTime !== originalHasScheduledTime) {
+                scheduleChanged = true;
+            }
 
             if (hasScheduledTime) {
                 if (!scheduleTime || scheduleTime === '') {
@@ -266,10 +277,20 @@ const updateWorkOrder = async (req, res) => {
                         message: 'Schedule time is required when time is enabled'
                     });
                 }
+                if ((scheduleTime || '') !== originalScheduleTime) {
+                    scheduleChanged = true;
+                }
                 workOrder.scheduleTime = scheduleTime;
             } else {
+                if (originalScheduleTime !== '') {
+                    scheduleChanged = true;
+                }
                 workOrder.scheduleTime = '';
             }
+        }
+
+        if (scheduleChanged) {
+            workOrder.notificationSent = false;
         }
 
         await workOrder.save();

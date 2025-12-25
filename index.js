@@ -12,7 +12,7 @@ const connectDB = require('./config/db');
 const routes = require('./routes');
 
 // Notification Service
-const { sendWorkOrderReminders, sendUpcomingReminders } = require('./services/notificationService');
+const { sendWorkOrderReminders, purgeOldFcmTokens } = require('./services/notificationService');
 
 // Initialize express app
 const app = express();
@@ -91,14 +91,15 @@ app.listen(PORT, () => {
         }
     }, 60000); // Every 1 minute
 
-    // Send upcoming reminders every 5 minutes
+    // Purge old FCM tokens once a day
     setInterval(async () => {
         try {
-            await sendUpcomingReminders();
+            const ttlDays = parseInt(process.env.FCM_TOKEN_TTL_DAYS || '60', 10);
+            await purgeOldFcmTokens(ttlDays);
         } catch (error) {
-            console.error('Upcoming reminder scheduler error:', error);
+            console.error('FCM token purge error:', error);
         }
-    }, 300000); // Every 5 minutes
+    }, 86400000); // Every 24 hours
 
     console.log('Notification scheduler started');
 });

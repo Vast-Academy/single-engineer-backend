@@ -3,7 +3,7 @@ const User = require('../models/User');
 // Register FCM token
 const registerFcmToken = async (req, res) => {
     try {
-        const { token, device } = req.body;
+        const { token, device, deviceId } = req.body;
 
         if (!token) {
             return res.status(400).json({
@@ -20,21 +20,46 @@ const registerFcmToken = async (req, res) => {
             });
         }
 
-        // Check if token already exists
-        const existingToken = user.fcmTokens.find(t => t.token === token);
-        if (existingToken) {
-            return res.status(200).json({
-                success: true,
-                message: 'Token already registered'
+        const now = new Date();
+        const normalizedDevice = device || 'web';
+        const existingByDevice = deviceId
+            ? user.fcmTokens.find(t => t.deviceId === deviceId)
+            : null;
+        const existingByToken = user.fcmTokens.find(t => t.token === token);
+
+        if (existingByDevice) {
+            existingByDevice.token = token;
+            existingByDevice.device = normalizedDevice;
+            existingByDevice.lastSeenAt = now;
+            if (!existingByDevice.createdAt) {
+                existingByDevice.createdAt = now;
+            }
+        } else if (existingByToken) {
+            existingByToken.deviceId = deviceId || existingByToken.deviceId;
+            existingByToken.device = normalizedDevice;
+            existingByToken.lastSeenAt = now;
+            if (!existingByToken.createdAt) {
+                existingByToken.createdAt = now;
+            }
+        } else {
+            user.fcmTokens.push({
+                token,
+                device: normalizedDevice,
+                deviceId: deviceId || undefined,
+                createdAt: now,
+                lastSeenAt: now
             });
         }
 
-        // Add new token
-        user.fcmTokens.push({
-            token,
-            device: device || 'web',
-            createdAt: new Date()
-        });
+        const maxTokens = parseInt(process.env.MAX_FCM_TOKENS_PER_USER || '10', 10);
+        if (Number.isFinite(maxTokens) && user.fcmTokens.length > maxTokens) {
+            user.fcmTokens.sort((a, b) => {
+                const aTime = new Date(a.lastSeenAt || a.createdAt || 0).getTime();
+                const bTime = new Date(b.lastSeenAt || b.createdAt || 0).getTime();
+                return aTime - bTime;
+            });
+            user.fcmTokens = user.fcmTokens.slice(-maxTokens);
+        }
 
         await user.save();
 
@@ -54,17 +79,21 @@ const registerFcmToken = async (req, res) => {
 // Remove FCM token
 const removeFcmToken = async (req, res) => {
     try {
-        const { token } = req.body;
+        const { token, deviceId } = req.body;
 
-        if (!token) {
+        if (!token && !deviceId) {
             return res.status(400).json({
                 success: false,
-                message: 'FCM token is required'
+                message: 'FCM token or deviceId is required'
             });
         }
 
+        const pullQuery = deviceId
+            ? { deviceId }
+            : { token };
+
         await User.findByIdAndUpdate(req.user._id, {
-            $pull: { fcmTokens: { token } }
+            $pull: { fcmTokens: pullQuery }
         });
 
         return res.status(200).json({
