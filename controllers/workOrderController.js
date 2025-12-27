@@ -90,7 +90,7 @@ const createWorkOrder = async (req, res) => {
 const getPendingWorkOrders = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 5;
+        const limit = parseInt(req.query.limit) || 1000;
         const skip = (page - 1) * limit;
 
         // Get total count
@@ -133,7 +133,7 @@ const getPendingWorkOrders = async (req, res) => {
 const getCompletedWorkOrders = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 5;
+        const limit = parseInt(req.query.limit) || 1000;
         const skip = (page - 1) * limit;
 
         // Get total count
